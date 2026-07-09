@@ -1,0 +1,171 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900;
+  }
+  
+  .dark body {
+    @apply bg-slate-900 text-slate-50;
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-100;
+  }
+  
+  .dark ::-webkit-scrollbar-track {
+    @apply bg-slate-800;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 rounded-full;
+  }
+  
+  .dark ::-webkit-scrollbar-thumb {
+    @apply bg-slate-600;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400;
+  }
+  
+  .dark ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-500;
+  }
+}
+
+@layer components {
+  /* Premium card styles */
+  .premium-card {
+    @apply bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300;
+  }
+  
+  .dark .premium-card {
+    @apply bg-slate-800 border-slate-700;
+  }
+  
+  /* Premium button styles */
+  .premium-button {
+    @apply px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-sm hover:shadow-lg;
+  }
+  
+  .premium-button-primary {
+    @apply premium-button bg-teal-500 hover:bg-teal-600 text-white;
+  }
+  
+  .premium-button-secondary {
+    @apply premium-button bg-amber-500 hover:bg-amber-600 text-white;
+  }
+  
+  /* Premium input styles */
+  .premium-input {
+    @apply w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-300;
+  }
+  
+  .dark .premium-input {
+    @apply bg-slate-700 border-slate-600 text-slate-50 focus:ring-teal-500;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .glass-effect {
+    @apply backdrop-blur-xl bg-opacity-80;
+  }
+  
+  .gradient-border {
+    @apply relative;
+  }
+  
+  .gradient-border::before {
+    content: '';
+    @apply absolute inset-0 rounded-2xl p-[1px] bg-gradient-to-r from-teal-500 to-amber-500 -z-10;
+  }
+}
+
+html.light .super-admin-surface {
+  color: #0f172a;
+}
+
+html.light .super-admin-surface .bg-card {
+  background-color: #ffffff !important;
+}
+
+html.light .super-admin-surface .bg-sidebar {
+  background-color: #f8fafc !important;
+}
+
+html.light .super-admin-surface .bg-background {
+  background-color: #f8fafc !important;
+}
+
+html.light .super-admin-surface .border-gray-800,
+html.light .super-admin-surface .border-gray-700 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .super-admin-surface .hover\:bg-gray-800:hover,
+html.light .super-admin-surface .hover\:bg-gray-800\/50:hover,
+html.light .super-admin-surface .hover\:bg-gray-700:hover {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .super-admin-surface .text-white:not([class*="bg-primary"]):not([class*="bg-secondary"]):not([class*="bg-accent"]):not([class*="bg-success"]):not([class*="bg-danger"]):not([class*="bg-warning"]):not(button):not(a),
+html.light .super-admin-surface td.text-white,
+html.light .super-admin-surface h2.text-white,
+html.light .super-admin-surface h3.text-white,
+html.light .super-admin-surface h4.text-white,
+html.light .super-admin-surface p.text-white,
+html.light .super-admin-surface span.text-white {
+  color: #0f172a !important;
+}
+
+html.light .super-admin-surface .text-gray-300,
+html.light .super-admin-surface label.text-gray-300 {
+  color: #334155 !important;
+}
+
+html.light .super-admin-surface .text-gray-400,
+html.light .super-admin-surface th.text-gray-400 {
+  color: #64748b !important;
+}
+
+html.light .super-admin-surface .placeholder-gray-500::placeholder {
+  color: #64748b !important;
+}
+
+html.light .super-admin-surface input.bg-sidebar,
+html.light .super-admin-surface select.bg-sidebar,
+html.light .super-admin-surface textarea.bg-sidebar {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light .super-admin-surface table {
+  color: #334155;
+}
+
+html.light .super-admin-surface tbody tr {
+  background-color: #ffffff;
+}
+
+html.light .super-admin-surface tbody tr:hover {
+  background-color: #f8fafc;
+}
