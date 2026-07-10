@@ -10,21 +10,54 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  const clearSession = async ({ remote = true } = {}) => {
+    if (remote) {
+      try {
+        await superAdminApi.logout();
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+    } else {
+      window.localStorage.removeItem('super-admin-token');
+      window.localStorage.removeItem('super-admin-id');
+      window.localStorage.removeItem('super-admin-username');
+      window.localStorage.removeItem('super-admin-role');
+    }
+
+    setUser(null);
+    setIsAuthenticated(false);
+  };
+
   useEffect(() => {
     const token = window.localStorage.getItem('super-admin-token');
     const superAdminId = window.localStorage.getItem('super-admin-id');
     const username = window.localStorage.getItem('super-admin-username');
     const role = window.localStorage.getItem('super-admin-role');
 
-    if (token && superAdminId && isItManagementRole(role)) {
-      setUser({
-        id: superAdminId,
-        username,
-        role,
-      });
-      setIsAuthenticated(true);
-    }
-    setLoading(false);
+    const verifyStoredSession = async () => {
+      if (!token || !superAdminId || !isItManagementRole(role)) {
+        await clearSession({ remote: false });
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const profile = await superAdminApi.getProfile();
+        setUser({
+          id: profile.id || superAdminId,
+          username: profile.username || username,
+          role,
+        });
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.warn('Stored IT Management session is invalid:', error);
+        await clearSession();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    verifyStoredSession();
   }, []);
 
   const login = async (credentials) => {
@@ -54,14 +87,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    try {
-      await superAdminApi.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setUser(null);
-      setIsAuthenticated(false);
-    }
+    await clearSession();
   };
 
   const value = {

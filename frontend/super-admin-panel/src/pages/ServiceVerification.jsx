@@ -66,7 +66,7 @@ const ServiceVerification = () => {
       </div>
 
       <div className="premium-card overflow-hidden">
-        <div className="flex flex-col gap-4 border-b border-slate-200 p-6 dark:border-slate-700 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 border-b border-slate-200 p-6 dark:border-white/10 md:flex-row md:items-center md:justify-between">
           <h3 className="text-xl font-bold dark:text-slate-50 text-slate-900">Verification Queue</h3>
           <input
             value={query}
@@ -77,16 +77,16 @@ const ServiceVerification = () => {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px]">
-            <thead className="dark:bg-slate-800 bg-slate-100">
+            <thead className="bg-slate-100 dark:bg-slate-950/55">
               <tr>
                 {['Appointment', 'Patient', 'Doctor', 'Date', 'Payment', 'Service', 'Verification', 'Refund'].map((heading) => (
-                  <th key={heading} className="px-6 py-4 text-left text-sm font-bold dark:text-slate-300 text-slate-600">{heading}</th>
+                  <th key={heading} className="px-6 py-4 text-left text-sm font-bold text-slate-600 dark:text-sky-200">{heading}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+            <tbody className="divide-y divide-slate-200 dark:divide-white/10">
               {records.map((record) => (
-                <tr key={`${record.appointment_id}-${record.transaction_id}`} className="dark:hover:bg-slate-800/60 hover:bg-slate-50">
+                <tr key={`${record.appointment_id}-${record.transaction_id}`} className="hover:bg-slate-50 dark:bg-slate-800/35 dark:hover:bg-sky-400/10">
                   <td className="px-6 py-4 font-semibold dark:text-slate-50 text-slate-900">#{record.appointment_id}</td>
                   <td className="px-6 py-4 dark:text-slate-300 text-slate-700">{record.patient_name || '-'}</td>
                   <td className="px-6 py-4 dark:text-slate-300 text-slate-700">{record.doctor_name || '-'}</td>
@@ -94,10 +94,10 @@ const ServiceVerification = () => {
                   <td className="px-6 py-4 dark:text-slate-300 text-slate-700">{record.payment_status || '-'} ${Number(record.amount || 0).toFixed(2)}</td>
                   <td className="px-6 py-4 dark:text-slate-300 text-slate-700">{record.service_status || '-'}</td>
                   <td className="px-6 py-4">
-                    <span className="rounded-full bg-primary/15 px-3 py-1 text-sm font-semibold text-primary">{record.verification_status}</span>
+                    <span className="rounded-full bg-sky-500/15 px-3 py-1 text-sm font-semibold text-sky-600 dark:text-sky-200">{record.verification_status}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="rounded-full bg-amber-500/15 px-3 py-1 text-sm font-semibold text-amber-600">{record.refund_decision}</span>
+                    <span className="rounded-full bg-amber-500/15 px-3 py-1 text-sm font-semibold text-amber-600 dark:text-amber-200">{record.refund_decision}</span>
                   </td>
                 </tr>
               ))}

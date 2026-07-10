@@ -1,9 +1,36 @@
+import { useEffect, useState } from 'react';
 import { api } from '../services/api.js';
 
-function Avatar({ src, name, size = 'md', className = '' }) {
+function getRoleEmoji(role) {
+  if (!role) return '👤';
+  switch (role.toString().toLowerCase()) {
+    case 'doctor':
+      return '🩺';
+    case 'admin':
+    case 'super_admin':
+      return '🛡️';
+    case 'therapist':
+    case 'counselor':
+      return '🧠';
+    case 'support':
+      return '💬';
+    case 'user':
+      return '👤';
+    default:
+      return '👤';
+  }
+}
+
+function Avatar({ src, name, role, size = 'md', className = '' }) {
+  const [hasError, setHasError] = useState(false);
   const avatarUrl = api.getAvatarUrl(src);
   const initials = api.getInitials(name);
   const color = api.getInitialsColor(name);
+  const displayText = name?.trim() ? initials : getRoleEmoji(role);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [avatarUrl]);
 
   const sizeClasses = {
     xs: 'h-6 w-6 text-xs',
@@ -16,26 +43,23 @@ function Avatar({ src, name, size = 'md', className = '' }) {
 
   const sizeClass = sizeClasses[size] || sizeClasses.md;
 
-  if (avatarUrl) {
+  if (avatarUrl && !hasError) {
     return (
       <img
         src={avatarUrl}
         alt={name || 'Avatar'}
         className={`${sizeClass} rounded-full object-cover ${className}`}
-        onError={(e) => {
-          e.target.style.display = 'none';
-          e.target.nextSibling.style.display = 'flex';
-        }}
+        onError={() => setHasError(true)}
       />
     );
   }
 
   return (
     <div
-      className={`${sizeClass} rounded-full flex items-center justify-center font-semibold text-white ${className}`}
+      className={`${sizeClass} rounded-full flex items-center justify-center font-semibold tracking-tight text-white ${className}`}
       style={{ backgroundColor: color }}
     >
-      {initials}
+      {displayText}
     </div>
   );
 }

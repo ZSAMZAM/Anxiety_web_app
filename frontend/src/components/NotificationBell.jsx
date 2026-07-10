@@ -2,12 +2,16 @@ import { useEffect, useState, useRef } from 'react';
 import { FiBell } from 'react-icons/fi';
 import { api } from '../services/api.js';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
   const ref = useRef();
+  const { user } = useAuth();
 
+  // Polls the backend notification table so unread counts update across panels
+  // without requiring a manual page refresh.
   useEffect(() => {
     let mounted = true;
     const fetch = async () => {
@@ -32,7 +36,9 @@ export default function NotificationBell() {
     return () => document.removeEventListener('click', onDocClick);
   }, []);
 
-  const unreadCount = notifications.filter(n => (n.status || 'Unread') !== 'Read').length;
+  const role = String(user?.role || '').toLowerCase();
+  const notificationsPath = role === 'doctor' ? '/doctor/notifications' : role === 'admin' ? '/admin/notifications' : '/user/notifications';
+  const unreadCount = notifications.filter(n => !n.is_read && (n.status || 'Unread') !== 'Read').length;
   const latest = notifications.slice(0, 5);
 
   return (
@@ -49,7 +55,7 @@ export default function NotificationBell() {
           <div className="p-3 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Notifications</h4>
-              <Link to="/user/notifications" className="text-xs text-sky-600">View all</Link>
+              <Link to={notificationsPath} className="text-xs text-sky-600">View all</Link>
             </div>
           </div>
           <div className="max-h-64 overflow-y-auto">

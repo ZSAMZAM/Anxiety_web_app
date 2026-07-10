@@ -66,7 +66,6 @@ export function ThemeProvider({ children }) {
   const toggleTheme = useCallback(() => {
     setTheme((current) => {
       const newTheme = current === 'dark' ? 'light' : 'dark';
-      console.log(`🌓 Theme toggled: ${current} → ${newTheme}`);
       return newTheme;
     });
   }, []);

@@ -44,9 +44,9 @@ function DoctorSettings() {
 
       <div className="space-y-6">
         {/* Account Section */}
-        <div className="rounded-xl bg-white border border-slate-200 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+        <div className="rounded-xl bg-[#111827] border border-[#334155] p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 dark:bg-slate-800">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#0F172A]">
               <FiUser className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
@@ -66,11 +66,11 @@ function DoctorSettings() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Phone Number</label>
               <input
-                type="email"
-                value={settings.email || ''}
-                onChange={(e) => setSettings({ ...settings, email: e.target.value })}
+                type="tel"
+                value={settings.phone || ''}
+                onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
               />
             </div>
@@ -78,9 +78,9 @@ function DoctorSettings() {
         </div>
 
         {/* Change Password */}
-        <div className="rounded-xl bg-white border border-slate-200 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+        <div className="rounded-xl bg-[#111827] border border-[#334155] p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-50 dark:bg-slate-800">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#0F172A]">
               <FiLock className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />
             </div>
             <div>
@@ -115,7 +115,7 @@ function DoctorSettings() {
               Update Password
             </button>
             {status && (
-              <p className={`rounded-lg px-4 py-3 text-sm ${status.includes('successfully') ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
+              <p className={`rounded-lg px-4 py-3 text-sm ${status.includes('successfully') ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'}`}>
                 {status}
               </p>
             )}
@@ -123,9 +123,9 @@ function DoctorSettings() {
         </div>
 
         {/* Doctor Information */}
-        <div className="rounded-xl bg-white border border-slate-200 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+        <div className="rounded-xl bg-[#111827] border border-[#334155] p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 dark:bg-slate-800">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#0F172A]">
               <FiSettings className="h-6 w-6 text-green-600 dark:text-green-400" />
             </div>
             <div>
@@ -210,9 +210,9 @@ function DoctorSettings() {
         </div>
 
         {/* Preferences */}
-        <div className="rounded-xl bg-white border border-slate-200 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+        <div className="rounded-xl bg-[#111827] border border-[#334155] p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 dark:bg-slate-800">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#0F172A]">
               <FiBell className="h-6 w-6 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
@@ -227,7 +227,7 @@ function DoctorSettings() {
               {[
                 { label: 'Appointment Notifications', key: 'appointmentAlerts' },
                 { label: 'Patient Updates', key: 'patientUpdates' },
-                { label: 'Email Notifications', key: 'emailPreferences' },
+                { label: 'SMS Notifications', key: 'smsPreferences' },
               ].map((item) => (
                 <label key={item.key} className="flex items-center justify-between p-4 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition dark:border-slate-700 dark:hover:bg-slate-900/50">
                   <span className="text-slate-700 dark:text-slate-300 font-medium">{item.label}</span>

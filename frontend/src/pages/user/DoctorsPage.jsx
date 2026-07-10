@@ -13,11 +13,22 @@ function DoctorsPage() {
   const [specializationFilter, setSpecializationFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name'); // name, rating
   const [loading, setLoading] = useState(true);
+  const [assessmentChecked, setAssessmentChecked] = useState(false);
+  const [assessmentState, setAssessmentState] = useState({
+    hasAssessment: false,
+    canBookTherapist: false,
+    bookingMessage: 'Please complete your mental health assessment before booking a therapist.',
+  });
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const loadDoctors = async (params = {}) => {
+    if (!assessmentState.canBookTherapist) {
+      setDoctors([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -33,11 +44,44 @@ function DoctorsPage() {
   };
 
   useEffect(() => {
+    api.getAssessmentBookingState()
+      .then((state) => {
+        setAssessmentState(state);
+        setAssessmentChecked(true);
+      })
+      .catch(() => {
+        setAssessmentState({
+          hasAssessment: false,
+          canBookTherapist: false,
+          bookingMessage: 'Please complete your mental health assessment before booking a therapist.',
+        });
+        setAssessmentChecked(true);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!assessmentChecked) return;
+    if (!assessmentState.canBookTherapist) {
+      setDoctors([]);
+      setLoading(false);
+      return;
+    }
     const params = {};
     if (statusFilter && statusFilter !== 'all') params.status = statusFilter;
     if (search) params.search = search;
     loadDoctors(params);
-  }, [statusFilter, search]);
+  }, [assessmentChecked, assessmentState.canBookTherapist, statusFilter, search]);
+
+  const handleBook = (doctor) => {
+    if (!assessmentState.canBookTherapist) {
+      const target = assessmentState.hasAssessment ? '/user/history' : '/user/assessment';
+      navigate(target, {
+        state: { message: assessmentState.bookingMessage },
+      });
+      return;
+    }
+    navigate(`/user/booking/${doctor.id}`, { state: { doctor } });
+  };
 
   const filtered = useMemo(() => {
     const s = (search || '').toLowerCase();
@@ -128,8 +172,20 @@ function DoctorsPage() {
         </select>
       </div>
 
-      {loading ? (
+      {!assessmentChecked || loading ? (
         <div className="rounded-[2rem] border border-white/20 bg-white/10 p-8 text-gray-600 shadow-xl backdrop-blur-xl">Loading doctors…</div>
+      ) : !assessmentState.canBookTherapist ? (
+        <div className="rounded-[2rem] border border-amber-200 bg-amber-50 p-8 text-amber-800 shadow-xl backdrop-blur-xl">
+          <p className="text-lg font-semibold">Booking is not available yet</p>
+          <p className="mt-2 text-sm">{assessmentState.bookingMessage}</p>
+          <button
+            type="button"
+            onClick={() => navigate(assessmentState.hasAssessment ? '/user/history' : '/user/assessment')}
+            className="mt-5 rounded-3xl bg-gradient-to-r from-cyan-500 to-sky-500 px-5 py-3 text-sm font-semibold text-white shadow-lg"
+          >
+            {assessmentState.hasAssessment ? 'View History' : 'Start Assessment'}
+          </button>
+        </div>
       ) : error ? (
         <div className="rounded-[2rem] border border-red-200 bg-red-50 p-8 text-red-700 shadow-xl backdrop-blur-xl">{error}</div>
       ) : (
@@ -139,7 +195,9 @@ function DoctorsPage() {
               <DoctorCard
                 key={doctor.id}
                 doctor={doctor}
-                onBook={() => navigate(`/user/booking/${doctor.id}`, { state: { doctor } })}
+                canBook={assessmentState.canBookTherapist}
+                disabledReason={assessmentState.bookingMessage}
+                onBook={() => handleBook(doctor)}
               />
             ))
           ) : (

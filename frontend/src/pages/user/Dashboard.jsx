@@ -20,6 +20,11 @@ function UserDashboard() {
   const [recommendedDoctors, setRecommendedDoctors] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [assessmentState, setAssessmentState] = useState({
+    hasAssessment: false,
+    canBookTherapist: false,
+    bookingMessage: 'Please complete your mental health assessment before booking a therapist.',
+  });
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -113,6 +118,8 @@ function UserDashboard() {
       setLoadingPredictions(true);
       try {
         const history = await api.getPredictionHistory();
+        const bookingState = await api.getAssessmentBookingState();
+        setAssessmentState(bookingState);
         setPredictionHistory(history.map((item) => ({
           ...item,
           result: normalizeResultType(item.result || item.anxietyLevel),
@@ -153,8 +160,14 @@ function UserDashboard() {
         );
         setUpcomingAppointment(upcoming || null);
 
-        const doctors = await api.getDoctors();
-        setRecommendedDoctors((doctors || []).slice(0, 4));
+        const currentAssessmentState = await api.getAssessmentBookingState();
+        setAssessmentState(currentAssessmentState);
+        if (currentAssessmentState.canBookTherapist) {
+          const doctors = await api.getDoctors();
+          setRecommendedDoctors((doctors || []).slice(0, 4));
+        } else {
+          setRecommendedDoctors([]);
+        }
 
         const notifications = await api.getUserNotifications();
         setNotifications(notifications.slice(0, 3));
@@ -262,7 +275,9 @@ function UserDashboard() {
             <Avatar src={user?.avatar} name={user?.fullname || user?.name} size="2xl" className="border-4 border-cyan-200 shadow-lg" />
             <div className="flex-1">
               <p className="text-sm uppercase tracking-[0.35em] text-sky-600 dark:text-sky-300">Welcome back</p>
-              <h2 className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">Hi, {user?.name?.split(' ')[0] || 'there'}.</h2>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <h2 className="text-3xl font-semibold text-slate-900 dark:text-slate-100">Hi, {user?.name?.split(' ')[0] || 'there'}.</h2>
+              </div>
               <p className="mt-2 text-slate-600 dark:text-slate-400">Your anxiety insights and wellness data are displayed below. Check your prediction trends and recent activity.</p>
             </div>
             <div className="flex gap-4">
@@ -360,7 +375,9 @@ function UserDashboard() {
         <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
           {[
             { label: 'Start Assessment', icon: FiActivity, to: '/user/assessment', tone: 'from-cyan-500 to-sky-500' },
-            { label: 'Book Therapist', icon: FiHeart, to: '/user/doctors', tone: 'from-violet-500 to-fuchsia-500' },
+            ...(assessmentState.canBookTherapist
+              ? [{ label: 'Book Therapist', icon: FiHeart, to: '/user/doctors', tone: 'from-violet-500 to-fuchsia-500' }]
+              : []),
             { label: 'Appointments', icon: FiCalendar, to: '/user/appointments', tone: 'from-emerald-500 to-teal-500' },
             { label: 'History', icon: FiBarChart2, to: '/user/history', tone: 'from-amber-500 to-orange-500' },
             { label: 'Notifications', icon: FiBell, to: '/user/notifications', tone: 'from-rose-500 to-pink-500' },
@@ -388,7 +405,9 @@ function UserDashboard() {
           </div>
           {recommendations.length === 0 ? (
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
-              Complete an assessment to load personalized recommendations from the backend.
+              {assessmentState.hasAssessment
+                ? 'Your latest result does not require therapist booking. Continue with supportive recommendations.'
+                : 'Complete an assessment to load personalized recommendations from the backend.'}
             </div>
           ) : (
             <div className="space-y-4">
@@ -396,18 +415,18 @@ function UserDashboard() {
                 const message = typeof rec === 'string' ? rec : rec.message || rec.title || rec.description || 'Recommendation available';
                 const priority = String(rec.priority || rec.risk_level || 'normal').toLowerCase();
                 const tone = priority.includes('high') || priority.includes('critical')
-                  ? 'border-red-200 bg-red-50'
+                  ? 'border-red-200 bg-red-50 dark:border-red-400/30 dark:bg-red-500/10'
                   : priority.includes('medium') || priority.includes('moderate')
-                    ? 'border-amber-200 bg-amber-50'
-                    : 'border-emerald-200 bg-emerald-50';
+                    ? 'border-amber-200 bg-amber-50 dark:border-amber-400/30 dark:bg-amber-500/10'
+                    : 'border-emerald-200 bg-emerald-50 dark:border-emerald-400/30 dark:bg-emerald-500/10';
                 return (
                   <div key={`${message}-${idx}`} className={`rounded-3xl border p-4 ${tone}`}>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-slate-900">{message}</p>
-                        <p className="mt-1 text-xs text-slate-600 capitalize">{priority} priority</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{message}</p>
+                        <p className="mt-1 text-xs text-slate-600 capitalize dark:text-slate-300">{priority} priority</p>
                       </div>
-                      <span className="inline-flex rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-slate-700">
+                      <span className="inline-flex rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-950/60 dark:text-slate-100">
                         {priority}
                       </span>
                     </div>
@@ -424,7 +443,11 @@ function UserDashboard() {
             <p className="text-sm uppercase tracking-[0.35em] text-sky-600">Therapists</p>
             <h2 className="mt-3 text-2xl font-semibold text-slate-900 dark:text-slate-100">Recommended Therapists</h2>
           </div>
-          {recommendedDoctors.length === 0 ? (
+          {!assessmentState.canBookTherapist ? (
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+              {assessmentState.bookingMessage}
+            </div>
+          ) : recommendedDoctors.length === 0 ? (
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
               Therapists from the backend will appear here when doctors are available.
             </div>

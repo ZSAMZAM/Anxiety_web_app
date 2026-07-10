@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import { LandingThemeProvider } from './contexts/LandingThemeContext.jsx';
+import { LanguageProvider } from './context/LanguageContext.jsx';
 
 // Global error handlers to surface uncaught errors in DevTools
 // and avoid silent white screens during development/production.
@@ -35,11 +36,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <LandingThemeProvider>
         <ThemeProvider>
-          <ToastProvider>
-            <AuthProvider>
-              <App />
-            </AuthProvider>
-          </ToastProvider>
+          <LanguageProvider>
+            <ToastProvider>
+              <AuthProvider>
+                <App />
+              </AuthProvider>
+            </ToastProvider>
+          </LanguageProvider>
         </ThemeProvider>
       </LandingThemeProvider>
     </BrowserRouter>

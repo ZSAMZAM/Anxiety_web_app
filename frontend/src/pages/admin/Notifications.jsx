@@ -28,12 +28,19 @@ function AdminNotifications() {
 
   useEffect(() => {
     loadNotifications();
+    const intervalId = window.setInterval(() => loadNotifications({ silent: true }), 30000);
+    const onFocus = () => loadNotifications({ silent: true });
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [filters]);
 
-  const loadNotifications = async () => {
+  const loadNotifications = async ({ silent = false } = {}) => {
     try {
       setLoadError('');
-      setLoading(true);
+      if (!silent) setLoading(true);
       const data = await api.getAdminNotifications(filters);
       setNotifications(data.notifications || []);
       if (data.error) {
@@ -43,7 +50,7 @@ function AdminNotifications() {
       console.error('Failed to load notifications:', error);
       setLoadError(error?.message || 'Unable to load notifications.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -108,7 +115,7 @@ function AdminNotifications() {
       ['ID', 'Recipient', 'Message', 'Type', 'Status', 'Date'],
       ...notifications.map(n => [
         n.id,
-        n.recipient || n.user_email || 'All Users',
+        n.recipient || n.user_phone || 'All Users',
         `"${n.message?.replace(/"/g, '""')}"`,
         n.type || 'general',
         n.status || 'Unread',
@@ -372,7 +379,7 @@ function AdminNotifications() {
                   <td className="px-4 py-4">
                     <div>
                       <p className="font-semibold text-gray-900">{notification.recipient || notification.user_name || 'All Users'}</p>
-                      <p className="text-xs text-gray-500">{notification.user_email || 'Broadcast'}</p>
+                      <p className="text-xs text-gray-500">{notification.user_phone || 'Broadcast'}</p>
                     </div>
                   </td>
                   <td className="px-4 py-4 max-w-xs">

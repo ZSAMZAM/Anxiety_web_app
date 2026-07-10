@@ -30,7 +30,7 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-sky-50 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100">
+    <div className="min-h-screen bg-sky-50 text-slate-900 transition-colors duration-300 dark:bg-[#0F172A] dark:text-slate-100">
       <ErrorBoundary>
         <AnimatePresence mode="wait">
           <motion.div
@@ -52,7 +52,7 @@ function App() {
       {/* Toast Notifications */}
       {toast && (
         <div className="fixed right-4 top-4 z-50">
-          <div className="rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/90">
+          <div className="rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#243447]/90">
             <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">{toast.title}</p>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{toast.message}</p>
           </div>

@@ -1,11 +1,8 @@
 ﻿import axios from 'axios';
 
-// =========================================================
-// AXIOS INSTANCE SETUP
-// =========================================================
+// Central API client for the web panels. It attaches JWTs and formats backend errors.
 
-const defaultApiUrl = import.meta.env.DEV ? '/api' : 'http://127.0.0.1:5000/api';
-const apiBaseUrl = import.meta.env.DEV ? '/api' : import.meta.env.VITE_API_BASE_URL || defaultApiUrl;
+const apiBaseUrl = (import.meta.env.DEV ? '/api' : import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 const axiosInstance = axios.create({
   baseURL: apiBaseUrl,
   timeout: 15000,
@@ -17,10 +14,10 @@ const axiosInstance = axios.create({
 const formatAxiosError = (error) => {
   if (!error) return 'Unknown error occurred.';
   if (error.response) {
-    return error.response.data?.error || `Server error: ${error.response.status}`;
+    return error.response.data?.message || error.response.data?.error || 'Server temporarily unavailable. Please try again.';
   }
   if (error.request) {
-    return `Network Error: Cannot connect to backend at ${apiBaseUrl}`;
+    return 'No internet connection or server is temporarily unavailable.';
   }
   return error.message || 'Unknown error occurred.';
 };
@@ -31,14 +28,19 @@ const formatAxiosError = (error) => {
 
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = window.localStorage.getItem('anxiety-token');
+    const authFreePaths = ['/login', '/otp/send', '/otp/verify', '/register', '/password/forgot', '/password/reset'];
+    const requestUrl = String(config.url || '');
+    const skipAuth = authFreePaths.some((path) => requestUrl === path || requestUrl.endsWith(path));
+    if (skipAuth) {
+      return config;
+    }
+    const token = window.sessionStorage.getItem('anxiety-token') || window.localStorage.getItem('anxiety-token');
     if (token) {
       config.headers = {
         ...config.headers,
         Authorization: `Bearer ${token}`,
       };
     }
-    console.log(`📤 API Request: ${config.method.toUpperCase()} ${config.url}`);
     return config;
   },
   (error) => {
@@ -52,14 +54,20 @@ axiosInstance.interceptors.request.use(
 // =========================================================
 
 axiosInstance.interceptors.response.use(
-  (response) => {
-    console.log(`📥 API Response: ${response.status} ${response.config.url}`);
-    return response;
-  },
+  (response) => response,
   (error) => {
     if (error.response) {
       console.error(`❌ API Error ${error.response.status}:`, error.response.data);
       error.message = formatAxiosError(error);
+      if (error.response.status === 401) {
+        window.localStorage.removeItem('anxiety-token');
+        window.localStorage.removeItem('anxiety-user');
+        window.localStorage.removeItem('anxiety-role');
+        window.sessionStorage.removeItem('anxiety-token');
+        window.sessionStorage.removeItem('anxiety-user');
+        window.sessionStorage.removeItem('anxiety-role');
+        window.dispatchEvent(new CustomEvent('anxiety-auth-unauthorized'));
+      }
     } else if (error.request) {
       console.error('❌ No response from server. Check if backend is running:', error.request);
       error.message = formatAxiosError(error);
@@ -139,11 +147,37 @@ export const api = {
           anxietyLevel: item.anxietyLevel || item.prediction_result || item.class_name || normalizedResult,
           confidence: Number.isFinite(confidencePercent) ? confidencePercent : 0,
           summary: item.summary || `Detected ${item.anxietyLevel || item.prediction_result || item.class_name || normalizedResult} with ${Number.isFinite(confidencePercent) ? confidencePercent : 0}% confidence.`,
+          sharingStatus: item.sharing_status || 'self_assessment',
+          statusLabel: item.status_label || 'Self Assessment (Not Shared)',
         };
       });
     } catch (error) {
       console.error('Failed to load prediction history:', error);
       return [];
+    }
+  },
+
+  getAssessmentBookingState: async () => {
+    try {
+      const { data } = await axiosInstance.get('/history');
+      return {
+        hasAssessment: data.has_assessment === true || ((data.history || []).length > 0),
+        canBookTherapist: data.can_book_therapist === true,
+        bookingMessage: data.booking_message || 'Please complete your mental health assessment before booking a therapist.',
+        bookingBlockReason: data.booking_block_reason || null,
+        latestAssessment: data.latest_assessment || null,
+        history: data.history || [],
+      };
+    } catch (error) {
+      console.error('Failed to load assessment booking state:', error);
+      return {
+        hasAssessment: false,
+        canBookTherapist: false,
+        bookingMessage: 'Please complete your mental health assessment before booking a therapist.',
+        bookingBlockReason: 'assessment_status_unavailable',
+        latestAssessment: null,
+        history: [],
+      };
     }
   },
 
@@ -163,6 +197,66 @@ export const api = {
       return data;
     } catch (error) {
       console.error('Failed to load doctor availability:', error);
+      throw error;
+    }
+  },
+
+  getDoctorSchedule: async (params = {}) => {
+    try {
+      const { data } = await axiosInstance.get('/doctor/schedule', { params });
+      return data;
+    } catch (error) {
+      console.error('Failed to load doctor schedule:', error);
+      throw error;
+    }
+  },
+
+  createDoctorAvailability: async (payload) => {
+    try {
+      const { data } = await axiosInstance.post('/doctor/availability', payload);
+      return data;
+    } catch (error) {
+      console.error('Failed to create doctor availability:', error);
+      throw error;
+    }
+  },
+
+  updateDoctorAvailability: async (ruleId, payload) => {
+    try {
+      const { data } = await axiosInstance.put(`/doctor/availability/${ruleId}`, payload);
+      return data;
+    } catch (error) {
+      console.error('Failed to update doctor availability:', error);
+      throw error;
+    }
+  },
+
+  deleteDoctorAvailability: async (ruleId) => {
+    try {
+      const { data } = await axiosInstance.delete(`/doctor/availability/${ruleId}`);
+      return data;
+    } catch (error) {
+      console.error('Failed to delete doctor availability:', error);
+      throw error;
+    }
+  },
+
+  createDoctorUnavailableDates: async (payload) => {
+    try {
+      const { data } = await axiosInstance.post('/doctor/unavailable-dates', payload);
+      return data;
+    } catch (error) {
+      console.error('Failed to save unavailable dates:', error);
+      throw error;
+    }
+  },
+
+  deleteDoctorUnavailableDate: async (blockId) => {
+    try {
+      const { data } = await axiosInstance.delete(`/doctor/unavailable-dates/${blockId}`);
+      return data;
+    } catch (error) {
+      console.error('Failed to delete unavailable date:', error);
       throw error;
     }
   },
@@ -265,7 +359,7 @@ export const api = {
       return data.appointment || {};
     } catch (error) {
       console.error('Failed to book appointment:', error);
-      const message = error?.response?.data?.error || 'Unable to complete booking.';
+      const message = error?.response?.data?.message || error?.response?.data?.error || 'Unable to complete booking.';
       throw new Error(message);
     }
   },
@@ -276,7 +370,39 @@ export const api = {
       return data.payment || {};
     } catch (error) {
       console.error('Payment request failed:', error);
-      throw error;
+      const responseData = error?.response?.data || {};
+      throw new Error(responseData.message || responseData.error || responseData.payment?.message || responseData.payment?.failureReason || 'Payment failed. Please try again.');
+    }
+  },
+
+  getPaymentStatus: async (paymentId) => {
+    try {
+      const { data } = await axiosInstance.get(`/payments/${paymentId}/status`);
+      return data.payment || {};
+    } catch (error) {
+      console.error('Payment status request failed:', error);
+      const responseData = error?.response?.data || {};
+      throw new Error(responseData.message || responseData.error || 'Unable to check payment status.');
+    }
+  },
+
+  requestRefund: async (payload) => {
+    try {
+      const { data } = await axiosInstance.post('/refunds', payload);
+      return data;
+    } catch (error) {
+      console.error('Failed to request refund:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  getRefunds: async () => {
+    try {
+      const { data } = await axiosInstance.get('/refunds');
+      return data.refunds || [];
+    } catch (error) {
+      console.error('Failed to load refunds:', error);
+      return [];
     }
   },
 
@@ -290,17 +416,65 @@ export const api = {
     }
   },
 
-  updateProfile: async ({ name, email, password }) => {
+  updateProfile: async ({ fullname, username, phone, gender, age, hospital, date_of_birth, address, district, city, specialty, clinic_name, clinic_address, experience, experience_years, license_number, bio, availability_schedule, avatar, password, current_password }) => {
     try {
-      const payload = { name, email };
+      const payload = {
+        fullname,
+        username,
+        phone,
+        gender,
+        age,
+        hospital,
+        date_of_birth,
+        address,
+        district,
+        city,
+        specialty,
+        clinic_name,
+        clinic_address,
+        experience,
+        experience_years,
+        license_number,
+        bio,
+        availability_schedule,
+      };
+      if (avatar) {
+        payload.avatar = avatar;
+      }
       if (password) {
         payload.password = password;
+      }
+      if (current_password) {
+        payload.current_password = current_password;
       }
       const { data } = await axiosInstance.put('/profile', payload);
       return data;
     } catch (error) {
-      const message = error?.response?.data?.error || 'Profile update failed.';
-      throw new Error(message);
+      console.error('Failed to update profile:', error);
+      const responseData = error?.response?.data || {};
+      const message = responseData?.error || 'Profile update failed.';
+      const err = new Error(message);
+      if (responseData?.errors) {
+        err.errors = responseData.errors;
+      }
+      if (error?.response?.status) {
+        err.status = error.response.status;
+      }
+      throw err;
+    }
+  },
+
+  forcePasswordChange: async ({ token, current_password, password }) => {
+    try {
+      const { data } = await axiosInstance.post('/auth/force-password-change', {
+        token,
+        current_password,
+        password,
+      });
+      return data;
+    } catch (error) {
+      const responseData = error?.response?.data || {};
+      throw new Error(responseData?.error || error.message || 'Unable to update password.');
     }
   },
 
@@ -312,6 +486,16 @@ export const api = {
     } catch (error) {
       console.error('Failed to load admin appointments:', error);
       return { appointments: [], total: 0, page: 1, limit: 10, pages: 0 };
+    }
+  },
+
+  getAdminConsultationExtensions: async () => {
+    try {
+      const { data } = await axiosInstance.get('/admin/consultation-extensions');
+      return data;
+    } catch (error) {
+      console.error('Failed to load consultation extensions:', error);
+      return { stats: {}, doctors: [], history: [] };
     }
   },
 
@@ -335,12 +519,61 @@ export const api = {
     }
   },
 
+  getDoctorPayments: async (params = {}) => {
+    try {
+      const { data } = await axiosInstance.get('/doctor/payments', { params });
+      return data;
+    } catch (error) {
+      console.error('Failed to load doctor payments:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  getPaymentReceiptUrl: (paymentId) => {
+    if (!paymentId) return null;
+    const configuredUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || apiBaseUrl;
+    const backendApi = configuredUrl.replace(/\/+$/g, '').endsWith('/api')
+      ? configuredUrl.replace(/\/+$/g, '')
+      : `${configuredUrl.replace(/\/+$/g, '')}/api`;
+    return `${backendApi}/payments/${paymentId}/receipt`;
+  },
+
+  downloadPaymentReceipt: async (paymentId) => {
+    try {
+      const response = await axiosInstance.get(`/payments/${paymentId}/receipt`, { responseType: 'blob' });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to load payment receipt:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
   updateDoctorAppointmentStatus: async (appointmentId, status) => {
     try {
       const { data } = await axiosInstance.put(`/doctor/appointments/${appointmentId}`, { status });
       return data;
     } catch (error) {
       console.error('Failed to update doctor appointment status:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  extendDoctorAppointment: async (appointmentId, payload) => {
+    try {
+      const { data } = await axiosInstance.post(`/doctor/appointments/${appointmentId}/extend`, payload);
+      return data;
+    } catch (error) {
+      console.error('Failed to extend doctor appointment:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  completeDoctorConsultation: async (appointmentId, payload) => {
+    try {
+      const { data } = await axiosInstance.post(`/doctor/appointments/${appointmentId}/consultation`, payload);
+      return data;
+    } catch (error) {
+      console.error('Failed to complete doctor consultation:', error);
       throw new Error(formatAxiosError(error));
     }
   },
@@ -370,6 +603,41 @@ export const api = {
     }
   },
 
+  getFinancialLedger: async (params = {}) => {
+    try {
+      const { data } = await axiosInstance.get('/admin/financial-ledger', { params });
+      return data;
+    } catch (error) {
+      console.error('Failed to load financial ledger:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  getAdminPredictions: async (params = {}) => {
+    try {
+      const { data } = await axiosInstance.get('/admin/predictions', { params });
+      return data;
+    } catch (error) {
+      console.error('Failed to load admin predictions:', error);
+      return { predictions: [], total: 0, page: 1, limit: 10, pages: 0 };
+    }
+  },
+
+  getAdminPredictionStats: async () => {
+    try {
+      const { data } = await axiosInstance.get('/admin/predictions/stats');
+      return data;
+    } catch (error) {
+      console.error('Failed to load admin prediction stats:', error);
+      return {
+        result_counts: {},
+        confidence_distribution: {},
+        daily_predictions: [],
+        high_risk_users: [],
+      };
+    }
+  },
+
   updatePaymentServiceStatus: async (paymentId, payload) => {
     try {
       const { data } = await axiosInstance.put(`/admin/payments/${paymentId}/service`, payload);
@@ -386,6 +654,59 @@ export const api = {
       return data;
     } catch (error) {
       console.error('Failed to process refund:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  getAdminRefunds: async (params = {}) => {
+    try {
+      const { data } = await axiosInstance.get('/admin/refunds', { params });
+      return data;
+    } catch (error) {
+      console.error('Failed to load admin refunds:', error);
+      return { refunds: [], total: 0, page: 1, limit: 10, pages: 0 };
+    }
+  },
+
+  getAdminRefundStats: async () => {
+    try {
+      const { data } = await axiosInstance.get('/admin/refunds/stats');
+      return data;
+    } catch (error) {
+      console.error('Failed to load refund stats:', error);
+      return {};
+    }
+  },
+
+  getAdminRefund: async (refundId) => {
+    try {
+      const { data } = await axiosInstance.get(`/admin/refunds/${refundId}`);
+      return data.refund || null;
+    } catch (error) {
+      console.error('Failed to load refund details:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  updateAdminRefund: async (refundId, payload) => {
+    try {
+      const { data } = await axiosInstance.put(`/admin/refunds/${refundId}/action`, payload);
+      return data;
+    } catch (error) {
+      console.error('Failed to update refund:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  exportAdminRefunds: async (params = {}) => {
+    try {
+      const response = await axiosInstance.get('/admin/refunds/export', {
+        params,
+        responseType: 'blob',
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to export refunds:', error);
       throw new Error(formatAxiosError(error));
     }
   },
@@ -444,11 +765,48 @@ export const api = {
     }
   },
 
+  getProfile: async () => {
+    try {
+      const { data } = await axiosInstance.get('/profile');
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch profile:', error);
+      throw error;
+    }
+  },
+
+  getDoctorProfile: async () => {
+    try {
+      const { data } = await axiosInstance.get('/doctor/profile');
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch doctor profile:', error);
+      throw error;
+    }
+  },
+
+  updateDoctorProfile: async (payload) => {
+    try {
+      const { data } = await axiosInstance.put('/doctor/profileUpdate', payload);
+      return data;
+    } catch (error) {
+      console.error('Failed to update doctor profile:', error);
+      const responseData = error?.response?.data || {};
+      const message = responseData?.error || 'Doctor profile update failed.';
+      const err = new Error(message);
+      if (responseData?.errors) err.errors = responseData.errors;
+      if (error?.response?.status) err.status = error.response.status;
+      throw err;
+    }
+  },
+
   getAvatarUrl: (avatarPath) => {
     if (!avatarPath) return null;
     if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) return avatarPath;
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
-    return `${apiUrl}${avatarPath}`;
+
+    const configuredUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || apiBaseUrl;
+    const backendRoot = configuredUrl.replace(/\/api\/?$/, '').replace(/\/+$/g, '') || window.location.origin;
+    return `${backendRoot}${avatarPath.startsWith('/') ? avatarPath : `/${avatarPath}`}`;
   },
 
   getInitials: (name) => {
@@ -523,6 +881,26 @@ export const api = {
     } catch (error) {
       console.error('Failed to load report details:', error);
       return null;
+    }
+  },
+
+  generateAdminReports: async () => {
+    try {
+      const { data } = await axiosInstance.post('/admin/reports');
+      return data;
+    } catch (error) {
+      console.error('Failed to generate reports:', error);
+      throw error;
+    }
+  },
+
+  deleteAdminReport: async (reportId) => {
+    try {
+      const { data } = await axiosInstance.delete(`/admin/reports/${reportId}`);
+      return data;
+    } catch (error) {
+      console.error('Failed to delete report:', error);
+      throw error;
     }
   },
 
@@ -602,9 +980,109 @@ export const api = {
     }
   },
 
+  getAdminDoctorSchedules: async (params = {}) => {
+    try {
+      const { data } = await axiosInstance.get('/admin/doctor-schedules', { params });
+      return data;
+    } catch (error) {
+      console.error('Failed to load admin doctor schedules:', error);
+      throw error;
+    }
+  },
+
+  blockAdminDoctorDate: async (doctorId, payload) => {
+    try {
+      const { data } = await axiosInstance.post(`/admin/doctor-schedules/${doctorId}/blocked-dates`, payload);
+      return data;
+    } catch (error) {
+      console.error('Failed to block doctor date:', error);
+      throw error;
+    }
+  },
+
+  unblockAdminDoctorDate: async (blockId) => {
+    try {
+      const { data } = await axiosInstance.delete(`/admin/doctor-schedules/blocked-dates/${blockId}`);
+      return data;
+    } catch (error) {
+      console.error('Failed to unblock doctor date:', error);
+      throw error;
+    }
+  },
+
+  createAdminDoctorAvailability: async (doctorId, payload) => {
+    try {
+      const { data } = await axiosInstance.post(`/admin/doctor-schedules/${doctorId}/availability`, payload);
+      return data;
+    } catch (error) {
+      console.error('Failed to create doctor availability:', error);
+      throw error;
+    }
+  },
+
+  updateAdminDoctorAvailability: async (doctorId, ruleId, payload) => {
+    try {
+      const { data } = await axiosInstance.put(`/admin/doctor-schedules/${doctorId}/availability/${ruleId}`, payload);
+      return data;
+    } catch (error) {
+      console.error('Failed to update doctor availability:', error);
+      throw error;
+    }
+  },
+
+  deleteAdminDoctorAvailability: async (doctorId, ruleId) => {
+    try {
+      const { data } = await axiosInstance.delete(`/admin/doctor-schedules/${doctorId}/availability/${ruleId}`);
+      return data;
+    } catch (error) {
+      console.error('Failed to delete doctor availability:', error);
+      throw error;
+    }
+  },
+
+  getAdminDoctorPasswords: async (params = {}) => {
+    try {
+      const { data } = await axiosInstance.get('/admin/doctor-passwords', { params });
+      return data.passwords || [];
+    } catch (error) {
+      console.error('Failed to load doctor password records:', error);
+      throw error;
+    }
+  },
+
+  resetAdminDoctorPassword: async (doctorId) => {
+    try {
+      const { data } = await axiosInstance.post(`/admin/doctor-passwords/${doctorId}/reset`);
+      return data;
+    } catch (error) {
+      console.error('Failed to reset doctor password:', error);
+      throw error;
+    }
+  },
+
+  getAdminDoctorPasswordHistory: async (doctorId) => {
+    try {
+      const { data } = await axiosInstance.get(`/admin/doctor-passwords/${doctorId}/history`);
+      return data.history || [];
+    } catch (error) {
+      console.error('Failed to load doctor password history:', error);
+      throw error;
+    }
+  },
+
+  accessAdminDoctorPassword: async (doctorId, field, action = 'view') => {
+    try {
+      const { data } = await axiosInstance.post(`/admin/doctor-passwords/${doctorId}/access`, { field, action });
+      return data;
+    } catch (error) {
+      console.error('Failed to access doctor temporary password:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
   createDoctor: async (doctorData) => {
     try {
-      const { data } = await axiosInstance.post('/doctors/create', doctorData);
+      const { data } = await axiosInstance.post('/admin/doctors', doctorData);
       return data;
     } catch (error) {
       console.error('Failed to create doctor:', error);
@@ -700,6 +1178,111 @@ export const api = {
     } catch (error) {
       console.error('Failed to load recommendations:', error);
       return [];
+    }
+  },
+
+  getDoctorReviews: async () => {
+    try {
+      const { data } = await axiosInstance.get('/doctor/reviews');
+      return data;
+    } catch (error) {
+      console.error('Failed to load doctor reviews:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  getDoctorReports: async (params = {}) => {
+    try {
+      const { data } = await axiosInstance.get('/doctor/reports', { params });
+      return data;
+    } catch (error) {
+      console.error('Failed to load doctor reports:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  getDoctorReport: async (reportId) => {
+    try {
+      const { data } = await axiosInstance.get(`/doctor/reports/${reportId}`);
+      return data.report;
+    } catch (error) {
+      console.error('Failed to load doctor report details:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  updateDoctorReport: async (reportId, payload) => {
+    try {
+      const { data } = await axiosInstance.put(`/doctor/reports/${reportId}`, payload);
+      return data.report;
+    } catch (error) {
+      console.error('Failed to save doctor report:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  deleteDoctorReport: async (reportId) => {
+    try {
+      const { data } = await axiosInstance.delete(`/doctor/reports/${reportId}`);
+      return data;
+    } catch (error) {
+      console.error('Failed to delete doctor report:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  getDoctorReportStats: async () => {
+    try {
+      const { data } = await axiosInstance.get('/doctor/reports/stats');
+      return data;
+    } catch (error) {
+      console.error('Failed to load doctor report stats:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  getDoctorReportCharts: async () => {
+    try {
+      const { data } = await axiosInstance.get('/doctor/reports/charts');
+      return data;
+    } catch (error) {
+      console.error('Failed to load doctor report charts:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  exportDoctorReport: async (reportId, format = 'pdf') => {
+    try {
+      const response = await axiosInstance.get(`/doctor/reports/${reportId}/export/${format}`, {
+        responseType: 'blob',
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to export doctor report:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  exportDoctorReports: async (params = {}) => {
+    try {
+      const response = await axiosInstance.get('/doctor/reports/export', {
+        params,
+        responseType: 'blob',
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to export doctor reports:', error);
+      throw new Error(formatAxiosError(error));
+    }
+  },
+
+  getAdminDoctorReviews: async (params = {}) => {
+    try {
+      const { data } = await axiosInstance.get('/admin/doctor-reviews', { params });
+      return data;
+    } catch (error) {
+      console.error('Failed to load admin doctor reviews:', error);
+      throw new Error(formatAxiosError(error));
     }
   },
 

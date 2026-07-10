@@ -6,38 +6,47 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const list = await api.getUserNotifications();
       setNotifications(list);
     } catch (e) {
       console.error('Failed to load notifications', e);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const intervalId = window.setInterval(() => load({ silent: true }), 30000);
+    const onFocus = () => load({ silent: true });
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
 
   const markRead = async (id) => {
     try {
       await api.markNotificationRead(id);
-      setNotifications(n => n.map(x => x.id === id ? { ...x, status: 'Read' } : x));
+      setNotifications(n => n.map(x => x.id === id ? { ...x, status: 'Read', is_read: true } : x));
     } catch (e) { console.error(e); }
   };
 
   const markUnread = async (id) => {
     try {
       await api.markNotificationUnread(id);
-      setNotifications(n => n.map(x => x.id === id ? { ...x, status: 'Unread' } : x));
+      setNotifications(n => n.map(x => x.id === id ? { ...x, status: 'Unread', is_read: false } : x));
     } catch (e) { console.error(e); }
   };
 
   const markAll = async () => {
     try {
       await api.markAllNotificationsRead();
-      setNotifications(n => n.map(x => ({ ...x, status: 'Read' })));
+      setNotifications(n => n.map(x => ({ ...x, status: 'Read', is_read: true })));
     } catch (e) { console.error(e); }
   };
 
@@ -59,7 +68,7 @@ export default function NotificationsPage() {
     <div className="w-full space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">Notifications</h2>
+          <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Notifications</h2>
           {unreadCount > 0 && (
             <p className="text-sm text-sky-600 mt-1">{unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}</p>
           )}
@@ -70,14 +79,14 @@ export default function NotificationsPage() {
       </div>
 
       <div className="space-y-3">
-        {loading && <div className="text-sm text-gray-500">Loading...</div>}
-        {!loading && notifications.length === 0 && <div className="text-sm text-gray-500">No notifications.</div>}
+        {loading && <div className="text-sm text-gray-500 dark:text-slate-400">Loading...</div>}
+        {!loading && notifications.length === 0 && <div className="text-sm text-gray-500 dark:text-slate-400">No notifications.</div>}
         {notifications.map(n => (
-          <div key={n.id} className={`p-4 rounded-2xl border ${n.status === 'Read' || n.is_read ? 'bg-white border-gray-100' : 'bg-sky-50 border-sky-200'}`}>
+          <div key={n.id} className={`rounded-2xl border p-4 ${n.status === 'Read' || n.is_read ? 'border-gray-100 bg-white dark:border-white/10 dark:bg-slate-900/80' : 'border-sky-200 bg-sky-50 dark:border-sky-400/30 dark:bg-sky-500/10'}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
-                <p className="text-sm text-gray-800">{n.message || n.title}</p>
-                <p className="text-xs text-gray-500 mt-1">{new Date(n.created_at).toLocaleString()}</p>
+                <p className="text-sm text-gray-800 dark:text-slate-100">{n.message || n.title}</p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">{new Date(n.created_at).toLocaleString()}</p>
               </div>
               <div className="flex flex-col items-end gap-2">
                 <button 

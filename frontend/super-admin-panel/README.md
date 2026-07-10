@@ -58,7 +58,7 @@ npm run build
 
 The application connects to the backend API at:
 - Development: `/api` (proxied through Vite)
-- Production: `http://127.0.0.1:5000/api` (configurable via `VITE_API_BASE_URL`)
+- Production: configure the deployed backend URL via `VITE_API_BASE_URL`
 
 ## Theme
 

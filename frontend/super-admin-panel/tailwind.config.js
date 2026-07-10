@@ -6,13 +6,13 @@ export default {
       colors: {
         // Accent Colors
         primary: {
-          DEFAULT: '#14B8A6',
-          light: '#0F766E',
+          DEFAULT: '#0EA5E9',
+          light: '#38BDF8',
         },
         background: '#F8FAFC',
         card: '#FFFFFF',
         sidebar: '#F8FAFC',
-        accent: '#0EA5E9',
+        accent: '#22D3EE',
         warning: '#F59E0B',
         secondary: {
           DEFAULT: '#F59E0B',
@@ -81,7 +81,7 @@ export default {
       boxShadow: {
         'soft': '0 4px 20px rgba(0, 0, 0, 0.08)',
         'soft-lg': '0 8px 30px rgba(0, 0, 0, 0.12)',
-        'glow': '0 0 20px rgba(20, 184, 166, 0.3)',
+        'glow': '0 20px 60px -32px rgba(56, 189, 248, 0.55)',
       },
       animation: {
         'slide-in': 'slideIn 0.3s ease-out',

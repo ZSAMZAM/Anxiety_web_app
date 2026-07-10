@@ -2,13 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --it-primary: #2563EB;
+  --it-secondary: #1DA1F2;
+  --it-accent: #22D3EE;
+  --it-background: #F8FAFC;
+  --it-surface: #FFFFFF;
+  --it-card: #FFFFFF;
+  --it-text: #0F172A;
+  --it-muted: #64748B;
+  --it-placeholder: #9CA3AF;
+  --it-border: #D6E4F0;
+  --it-shadow: 0 24px 70px -44px rgba(15, 32, 51, 0.40);
+}
+
+html.dark {
+  --it-background: #0F172A;
+  --it-surface: #1E293B;
+  --it-card: #243447;
+  --it-text: #F8FAFC;
+  --it-muted: #CBD5E1;
+  --it-border: rgba(255, 255, 255, 0.08);
+  --it-shadow: 0 22px 70px -36px rgba(56, 189, 248, 0.42);
+}
+
 @layer base {
+  html,
+  body {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
   body {
     @apply bg-slate-50 text-slate-900;
   }
   
   .dark body {
-    @apply bg-slate-900 text-slate-50;
+    background: var(--it-background);
+    color: var(--it-text);
   }
   
   /* Custom scrollbar */
@@ -45,20 +75,35 @@
 @layer components {
   /* Premium card styles */
   .premium-card {
-    @apply bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300;
+    background: var(--it-card);
+    border: 1px solid var(--it-border);
+    color: var(--it-text);
+    box-shadow: var(--it-shadow);
+    @apply rounded-3xl hover:shadow-lg transition-all duration-300;
   }
   
   .dark .premium-card {
-    @apply bg-slate-800 border-slate-700;
+    background: linear-gradient(180deg, rgba(36, 52, 71, 0.96), rgba(30, 41, 59, 0.92));
+    border-color: var(--it-border);
   }
   
   /* Premium button styles */
   .premium-button {
-    @apply px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-sm hover:shadow-lg;
+    min-height: 56px;
+    border-radius: 16px;
+    font-size: 18px;
+    font-weight: 600;
+    @apply px-6 transition-all duration-200 shadow-sm hover:shadow-lg;
   }
   
   .premium-button-primary {
-    @apply premium-button bg-teal-500 hover:bg-teal-600 text-white;
+    @apply premium-button text-white;
+    background: linear-gradient(135deg, #1DA1F2, #2563EB);
+  }
+
+  .premium-button-primary:hover {
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, #0B91E2, #1D4ED8);
   }
   
   .premium-button-secondary {
@@ -67,11 +112,35 @@
   
   /* Premium input styles */
   .premium-input {
-    @apply w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-300;
+    background: #FFFFFF;
+    border: 1px solid #D6E4F0;
+    border-radius: 16px;
+    color: var(--it-text);
+    min-height: 56px;
+    font-size: 16px;
+    font-weight: 400;
+    @apply w-full px-4 outline-none transition-all duration-200;
+  }
+
+  .premium-input:hover {
+    border-color: #93C5FD;
+  }
+
+  .premium-input:focus {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, .12);
+  }
+
+  .premium-input::placeholder {
+    color: var(--it-placeholder);
+    font-weight: 400;
+    opacity: 1;
   }
   
   .dark .premium-input {
-    @apply bg-slate-700 border-slate-600 text-slate-50 focus:ring-teal-500;
+    background: rgba(15, 23, 42, 0.68);
+    border-color: var(--it-border);
+    color: var(--it-text);
   }
 }
 
@@ -147,15 +216,64 @@ html.light .super-admin-surface th.text-gray-400 {
 }
 
 html.light .super-admin-surface .placeholder-gray-500::placeholder {
-  color: #64748b !important;
+  color: #9CA3AF !important;
+  font-weight: 400 !important;
 }
 
 html.light .super-admin-surface input.bg-sidebar,
 html.light .super-admin-surface select.bg-sidebar,
 html.light .super-admin-surface textarea.bg-sidebar {
   background-color: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border-color: #D6E4F0 !important;
   color: #0f172a !important;
+}
+
+.super-admin-surface input,
+.super-admin-surface select,
+.super-admin-surface textarea {
+  min-height: 56px;
+  border: 1px solid #D6E4F0;
+  border-radius: 16px !important;
+  font-size: 16px;
+  font-weight: 400;
+  outline: none;
+  transition: border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
+}
+
+.super-admin-surface textarea {
+  min-height: 120px;
+  line-height: 1.55;
+}
+
+.super-admin-surface input[type="checkbox"],
+.super-admin-surface input[type="radio"] {
+  min-height: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.super-admin-surface input::placeholder,
+.super-admin-surface textarea::placeholder {
+  color: #9CA3AF !important;
+  font-weight: 400 !important;
+  opacity: 1;
+}
+
+.super-admin-surface input:hover,
+.super-admin-surface select:hover,
+.super-admin-surface textarea:hover {
+  border-color: #93C5FD !important;
+}
+
+.super-admin-surface input:focus,
+.super-admin-surface select:focus,
+.super-admin-surface textarea:focus {
+  border-color: #2563EB !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, .12) !important;
+}
+
+.super-admin-surface label {
+  letter-spacing: 0.01em;
 }
 
 html.light .super-admin-surface table {
@@ -168,4 +286,140 @@ html.light .super-admin-surface tbody tr {
 
 html.light .super-admin-surface tbody tr:hover {
   background-color: #f8fafc;
+}
+
+html.dark .super-admin-surface {
+  color: var(--it-text);
+}
+
+html.dark .super-admin-shell {
+  background: #0F172A !important;
+  color: #F8FAFC !important;
+}
+
+html.dark .super-admin-sidebar,
+html.dark .super-admin-topbar {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.96)) !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+  color: #F8FAFC !important;
+}
+
+html.dark .super-admin-sidebar span,
+html.dark .super-admin-sidebar a,
+html.dark .super-admin-sidebar button,
+html.dark .super-admin-topbar h1,
+html.dark .super-admin-topbar span,
+html.dark .super-admin-topbar button {
+  color: inherit;
+}
+
+html.dark .super-admin-sidebar a:not([class*="from-primary"]):not([class*="text-danger"]) {
+  color: #CBD5E1 !important;
+}
+
+html.dark .super-admin-sidebar a:not([class*="from-primary"]):hover,
+html.dark .super-admin-topbar button:hover {
+  background: rgba(56, 189, 248, 0.12) !important;
+  color: #F8FAFC !important;
+}
+
+html.dark .super-admin-sidebar a[class*="from-primary"] {
+  color: #FFFFFF !important;
+}
+
+html.dark .super-admin-topbar .premium-card,
+html.dark .super-admin-sidebar .premium-card {
+  background: #1E293B !important;
+}
+
+html.dark .super-admin-surface [class~="bg-card"],
+html.dark .super-admin-surface [class~="bg-slate-800"],
+html.dark .super-admin-surface [class~="dark:bg-slate-800"],
+html.dark .super-admin-surface [class~="dark:bg-slate-900"],
+html.dark .super-admin-surface [class~="dark:bg-slate-900/80"],
+html.dark .super-admin-surface [class~="bg-white"],
+html.dark .super-admin-surface .premium-card {
+  background: linear-gradient(180deg, rgba(36, 52, 71, 0.96), rgba(30, 41, 59, 0.90)) !important;
+  border-color: var(--it-border) !important;
+  box-shadow: var(--it-shadow) !important;
+}
+
+html.dark .super-admin-surface [class~="bg-sidebar"],
+html.dark .super-admin-surface [class~="bg-background"],
+html.dark .super-admin-surface [class~="dark:bg-slate-700"],
+html.dark .super-admin-surface [class~="dark:bg-slate-700/50"] {
+  background: rgba(15, 23, 42, 0.72) !important;
+}
+
+html.dark .super-admin-surface [class~="border-gray-800"],
+html.dark .super-admin-surface [class~="border-gray-700"],
+html.dark .super-admin-surface [class~="border-slate-700"],
+html.dark .super-admin-surface [class~="border-slate-800"],
+html.dark .super-admin-surface [class~="dark:border-slate-700"] {
+  border-color: var(--it-border) !important;
+}
+
+html.dark .super-admin-surface [class~="text-white"],
+html.dark .super-admin-surface [class~="text-slate-50"],
+html.dark .super-admin-surface [class~="dark:text-slate-50"] {
+  color: var(--it-text) !important;
+}
+
+html.dark .super-admin-surface [class~="text-gray-300"],
+html.dark .super-admin-surface [class~="text-gray-400"],
+html.dark .super-admin-surface [class~="text-slate-400"],
+html.dark .super-admin-surface [class~="dark:text-slate-400"] {
+  color: var(--it-muted) !important;
+}
+
+html.dark .super-admin-surface input,
+html.dark .super-admin-surface select,
+html.dark .super-admin-surface textarea {
+  background: rgba(15, 23, 42, 0.70) !important;
+  border-color: var(--it-border) !important;
+  color: var(--it-text) !important;
+}
+
+html.dark .super-admin-surface input::placeholder,
+html.dark .super-admin-surface textarea::placeholder {
+  color: #9CA3AF !important;
+  font-weight: 400 !important;
+}
+
+html.dark .super-admin-surface table {
+  border-collapse: separate;
+  border-spacing: 0 0.45rem;
+  color: var(--it-text);
+}
+
+html.dark .super-admin-surface thead tr {
+  background: rgba(15, 23, 42, 0.72) !important;
+}
+
+html.dark .super-admin-surface tbody tr {
+  background: rgba(36, 52, 71, 0.62) !important;
+  border-color: var(--it-border) !important;
+  transition: background 180ms ease, box-shadow 180ms ease;
+}
+
+html.dark .super-admin-surface tbody tr:hover {
+  background: rgba(56, 189, 248, 0.10) !important;
+  box-shadow: 0 14px 36px -30px rgba(56, 189, 248, 0.75);
+}
+
+html.dark .super-admin-surface th {
+  color: #9EDCF7 !important;
+  font-weight: 700;
+}
+
+html.dark .super-admin-surface button[class~="bg-white"],
+html.dark .super-admin-surface a[class~="bg-white"] {
+  background: rgba(36, 52, 71, 0.84) !important;
+  border-color: var(--it-border) !important;
+  color: var(--it-text) !important;
+}
+
+html.dark .super-admin-surface button[class~="bg-white"]:hover,
+html.dark .super-admin-surface a[class~="bg-white"]:hover {
+  background: rgba(14, 165, 233, 0.16) !important;
 }

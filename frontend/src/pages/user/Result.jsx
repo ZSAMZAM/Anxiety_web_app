@@ -7,6 +7,7 @@ const normalizeResultType = (value) => {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized.includes('anxiety')) return 'anxiety';
   if (normalized.includes('depression')) return 'depression';
+  if (normalized.includes('moderate') || normalized.includes('high risk')) return 'anxiety';
   if (normalized.includes('neutral')) return 'neutral';
   return 'neutral';
 };
@@ -115,28 +116,28 @@ function Result() {
             <div className="mb-6 flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm uppercase tracking-[0.35em] text-sky-600">Assessment result</p>
-                <h2 className="mt-3 text-3xl font-semibold text-gray-900">{latest.anxietyLevel}</h2>
+                <h2 className="mt-3 text-3xl font-semibold text-gray-900 dark:text-slate-100">{latest.anxietyLevel}</h2>
               </div>
               <div className="rounded-3xl bg-gradient-to-r from-cyan-500 to-sky-500 px-4 py-3 text-white shadow-lg">{latest.confidence}% confidence</div>
             </div>
-            <p className="text-gray-600">{latest.summary}</p>
-            <div className="mt-8 rounded-3xl bg-white/80 p-6 text-gray-600 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900">Recommended care</h3>
+            <p className="text-gray-600 dark:text-slate-300">{latest.summary}</p>
+            <div className="mt-8 rounded-3xl bg-white/80 p-6 text-gray-600 shadow-sm dark:bg-slate-900/80 dark:text-slate-300">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Recommended care</h3>
               <ul className="mt-4 space-y-3 text-sm">
                 {(latest.recommendedActions || [
                   'Practice mindfulness therapy.',
                   'Create a regular sleep schedule.',
                   'Share progress with a doctor.'
                 ]).map((item) => (
-                  <li key={item} className="rounded-3xl border border-gray-200 bg-white/80 p-4 shadow-sm">
+                  <li key={item} className="rounded-3xl border border-gray-200 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-950/70 dark:text-slate-200">
                     {item}
                   </li>
                 ))}
               </ul>
             </div>
-            <div className="mt-8 rounded-3xl bg-white/80 p-6 shadow-sm">
-              <p className="text-sm font-semibold text-gray-900">Decision support</p>
-              <p className="mt-3 text-gray-600">{supportMessage}</p>
+            <div className="mt-8 rounded-3xl bg-white/80 p-6 shadow-sm dark:bg-slate-900/80">
+              <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Decision support</p>
+              <p className="mt-3 text-gray-600 dark:text-slate-300">{supportMessage}</p>
               {needsSupport ? (
                 <div className="mt-6 flex flex-col gap-4 sm:flex-row">
                   <button
@@ -148,9 +149,9 @@ function Result() {
                   </button>
                 </div>
               ) : (
-                <div className="mt-6 space-y-4 text-sm text-gray-600">
+                <div className="mt-6 space-y-4 text-sm text-gray-600 dark:text-slate-300">
                   {educationItems.map((item) => (
-                    <div key={item} className="rounded-3xl border border-gray-200 bg-white/80 p-4 shadow-sm">
+                    <div key={item} className="rounded-3xl border border-gray-200 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-950/70">
                       {item}
                     </div>
                   ))}
@@ -160,9 +161,9 @@ function Result() {
           </div>
           <div className="rounded-[2rem] border border-white/20 bg-white/10 p-8 shadow-xl backdrop-blur-xl">
             <p className="text-sm uppercase tracking-[0.35em] text-sky-600">Suggested actions</p>
-            <ol className="mt-6 space-y-4 text-gray-600">
+            <ol className="mt-6 space-y-4 text-gray-600 dark:text-slate-300">
               {['Practice mindfulness therapy.', 'Create a regular sleep schedule.', 'Share progress with a doctor.'].map((item) => (
-                <li key={item} className="rounded-3xl border border-gray-200 bg-white/80 p-4 shadow-sm">
+                <li key={item} className="rounded-3xl border border-gray-200 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/80">
                   {item}
                 </li>
               ))}

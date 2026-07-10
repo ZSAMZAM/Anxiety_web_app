@@ -49,6 +49,19 @@ const Dashboard = () => {
   useEffect(() => {
     loadDashboardStats();
     loadChartData();
+    const intervalId = window.setInterval(() => {
+      loadDashboardStats();
+      loadChartData();
+    }, 30000);
+    const onFocus = () => {
+      loadDashboardStats();
+      loadChartData();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   const loadDashboardStats = async () => {
@@ -83,6 +96,7 @@ const Dashboard = () => {
       console.error('Failed to load chart data:', error);
     }
   };
+
 
   const processMonthlyData = (appointments) => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -139,6 +153,7 @@ const Dashboard = () => {
     return { status: 'Unknown', icon: Activity, color: 'slate', bgColor: 'bg-slate-500/20' };
   };
 
+
   const statCards = [
     { 
       title: 'Total Patients', 
@@ -188,6 +203,34 @@ const Dashboard = () => {
       icon: Clock, 
       color: 'amber',
       source: 'Live backend metric'
+    },
+    {
+      title: 'New Assessments Today',
+      value: stats?.new_assessments_today || 0,
+      icon: Brain,
+      color: 'teal',
+      source: 'Assessment events today'
+    },
+    {
+      title: 'New Payments Today',
+      value: stats?.new_payments_today || 0,
+      icon: DollarSign,
+      color: 'emerald',
+      source: 'Completed payments today'
+    },
+    {
+      title: 'New Appointments Today',
+      value: stats?.new_appointments_today || 0,
+      icon: Calendar,
+      color: 'secondary',
+      source: 'Bookings created today'
+    },
+    {
+      title: 'New Doctors Today',
+      value: stats?.new_doctors_today || 0,
+      icon: Stethoscope,
+      color: 'primary',
+      source: 'Activated doctors today'
     },
     {
       title: 'Failed Logins Today',
@@ -260,6 +303,7 @@ const Dashboard = () => {
           );
         })}
       </div>
+
 
       {/* System Health Card */}
       <div className="premium-card p-6">

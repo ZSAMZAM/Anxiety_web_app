@@ -31,22 +31,6 @@ import {
 } from 'lucide-react';
 import { publicApi } from '../services/api.js';
 import { useLandingTheme } from '../contexts/LandingThemeContext';
-import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -64,7 +48,7 @@ const LandingPage = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [contactForm, setContactForm] = useState({
     name: '',
-    email: '',
+    phone: '',
     subject: '',
     message: ''
   });
@@ -100,11 +84,27 @@ const LandingPage = () => {
     try {
       await publicApi.submitContactForm(contactForm);
       setContactSubmitted(true);
-      setContactForm({ name: '', email: '', subject: '', message: '' });
+      setContactForm({ name: '', phone: '', subject: '', message: '' });
       setTimeout(() => setContactSubmitted(false), 5000);
     } catch (error) {
       console.error('Error submitting contact form:', error);
     }
+  };
+
+  const scrollToSection = (sectionId) => {
+    setMobileMenuOpen(false);
+
+    if (sectionId === 'home') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+
+    const headerOffset = 96;
+    const top = section.getBoundingClientRect().top + window.scrollY - headerOffset;
+    window.scrollTo({ top, behavior: 'smooth' });
   };
 
   const AnimatedCounter = ({ value, label, icon: Icon, color }) => {
@@ -259,31 +259,6 @@ const LandingPage = () => {
     );
   }
 
-  // Sample analytics data (in production, fetch from API)
-  const analyticsData = {
-    anxietyDistribution: [
-      { name: 'Mild', value: 35, color: '#22C55E' },
-      { name: 'Moderate', value: 40, color: '#F59E0B' },
-      { name: 'Severe', value: 25, color: '#EF4444' },
-    ],
-    appointmentsTrend: [
-      { month: 'Jan', appointments: 120 },
-      { month: 'Feb', appointments: 150 },
-      { month: 'Mar', appointments: 180 },
-      { month: 'Apr', appointments: 220 },
-      { month: 'May', appointments: 280 },
-      { month: 'Jun', appointments: 320 },
-    ],
-    revenueTrend: [
-      { month: 'Jan', revenue: 15000 },
-      { month: 'Feb', revenue: 18000 },
-      { month: 'Mar', revenue: 22000 },
-      { month: 'Apr', revenue: 28000 },
-      { month: 'May', revenue: 35000 },
-      { month: 'Jun', revenue: 42000 },
-    ],
-  };
-
   return (
     <div className="min-h-screen dark:bg-slate-950 bg-slate-50">
       {/* Navigation */}
@@ -305,21 +280,21 @@ const LandingPage = () => {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
-              <Link to="/" className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
+              <button type="button" onClick={() => scrollToSection('home')} className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
                 Home
-              </Link>
-              <Link to="#doctors" className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
+              </button>
+              <button type="button" onClick={() => scrollToSection('doctors')} className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
                 Doctors
-              </Link>
-              <Link to="#features" className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
+              </button>
+              <button type="button" onClick={() => scrollToSection('features')} className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
                 Features
-              </Link>
-              <Link to="#how-it-works" className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
+              </button>
+              <button type="button" onClick={() => scrollToSection('how-it-works')} className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
                 How It Works
-              </Link>
-              <Link to="#contact" className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
+              </button>
+              <button type="button" onClick={() => scrollToSection('contact')} className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
                 Contact
-              </Link>
+              </button>
             </div>
 
             <div className="hidden md:flex items-center gap-4">
@@ -356,21 +331,21 @@ const LandingPage = () => {
           {mobileMenuOpen && (
             <div className="md:hidden py-4 border-t dark:border-slate-700 border-slate-200">
               <div className="flex flex-col gap-4">
-                <Link to="/" className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
+                <button type="button" onClick={() => scrollToSection('home')} className="text-left dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
                   Home
-                </Link>
-                <Link to="#doctors" className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
+                </button>
+                <button type="button" onClick={() => scrollToSection('doctors')} className="text-left dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
                   Doctors
-                </Link>
-                <Link to="#features" className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
+                </button>
+                <button type="button" onClick={() => scrollToSection('features')} className="text-left dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
                   Features
-                </Link>
-                <Link to="#how-it-works" className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
+                </button>
+                <button type="button" onClick={() => scrollToSection('how-it-works')} className="text-left dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
                   How It Works
-                </Link>
-                <Link to="#contact" className="dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
+                </button>
+                <button type="button" onClick={() => scrollToSection('contact')} className="text-left dark:text-slate-400 text-slate-600 hover:text-primary font-medium transition-colors">
                   Contact
-                </Link>
+                </button>
                 <div className="flex flex-col gap-3 pt-4 border-t dark:border-slate-700 border-slate-200">
                   <button
                     onClick={toggleTheme}
@@ -399,7 +374,7 @@ const LandingPage = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="min-h-screen pt-20 px-4 sm:px-6 lg:px-8 dark:bg-hero-gradient-dark bg-hero-gradient relative overflow-hidden">
+      <section id="home" className="min-h-screen pt-20 px-4 sm:px-6 lg:px-8 dark:bg-hero-gradient-dark bg-hero-gradient relative overflow-hidden">
         {/* Animated Background Shapes */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div
@@ -738,7 +713,7 @@ const LandingPage = () => {
       {/* Assessment Preview Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 dark:bg-slate-900 bg-white">
         <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="max-w-3xl">
             <motion.div
               initial={{ opacity: 0, x: -50 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -748,15 +723,14 @@ const LandingPage = () => {
                 Professional Assessment Preview
               </h2>
               <p className="text-xl dark:text-slate-400 text-slate-600 mb-8 leading-relaxed">
-                Experience our AI-powered mental health assessment with professionally designed questions and instant results.
+                Experience our AI-powered mental health assessment with instant results and personalized guidance.
               </p>
               
               <div className="space-y-4 mb-8">
                 {[
-                  'Evidence-based questionnaire',
-                  'Real-time progress tracking',
                   'Instant AI-powered results',
                   'Personalized recommendations',
+                  'Secure mental wellness support',
                 ].map((feature, index) => (
                   <motion.div
                     key={index}
@@ -778,162 +752,6 @@ const LandingPage = () => {
               >
                 Open Web Login
               </button>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: 50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="premium-card p-8"
-            >
-              <div className="mb-6">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium dark:text-slate-400 text-slate-600">Progress</span>
-                  <span className="text-sm font-medium primary">3/10</span>
-                </div>
-                <div className="w-full h-2 dark:bg-slate-700 bg-slate-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-primary rounded-full" style={{ width: '30%' }} />
-                </div>
-              </div>
-
-              <div className="space-y-4 mb-8">
-                <div className="p-4 dark:bg-slate-800 bg-slate-50 rounded-xl">
-                  <p className="dark:text-slate-300 text-slate-700 font-medium mb-2">Question 3 of 10</p>
-                  <p className="dark:text-slate-400 text-slate-600 text-sm">
-                    How often have you felt nervous, anxious, or on edge over the past 2 weeks?
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  {['Not at all', 'Several days', 'More than half the days', 'Nearly every day'].map((option, index) => (
-                    <button
-                      key={index}
-                      className={`w-full p-4 rounded-xl text-left transition-all ${
-                        index === 2
-                          ? 'bg-gradient-primary text-white'
-                          : 'dark:bg-slate-800 bg-slate-50 dark:text-slate-300 text-slate-700 hover:dark:bg-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <button className="flex-1 premium-button py-3">Previous</button>
-                <button className="flex-1 premium-button-primary py-3">Next</button>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* Platform Analytics Preview Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 dark:bg-slate-900 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl lg:text-5xl font-bold dark:text-slate-50 text-slate-900 mb-4">
-              Platform Analytics
-            </h2>
-            <p className="text-xl dark:text-slate-400 text-slate-600 max-w-2xl mx-auto">
-              Real-time insights into our platform's performance and impact
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Anxiety Distribution Chart */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="premium-card p-6"
-            >
-              <h3 className="text-xl font-bold dark:text-slate-50 text-slate-900 mb-6">Anxiety Distribution</h3>
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={analyticsData.anxietyDistribution}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {analyticsData.anxietyDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </motion.div>
-
-            {/* Appointments Trend Chart */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
-              className="premium-card p-6"
-            >
-              <h3 className="text-xl font-bold dark:text-slate-50 text-slate-900 mb-6">Appointments Trend</h3>
-              <ResponsiveContainer width="100%" height={250}>
-                <AreaChart data={analyticsData.appointmentsTrend}>
-                  <defs>
-                    <linearGradient id="colorAppointments" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0EA5E9" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#0EA5E9" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#334155' : '#E2E8F0'} />
-                  <XAxis dataKey="month" stroke={isDarkMode ? '#94A3B8' : '#64748B'} />
-                  <YAxis stroke={isDarkMode ? '#94A3B8' : '#64748B'} />
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                      border: `1px solid ${isDarkMode ? '#334155' : '#E2E8F0'}`,
-                      borderRadius: '12px',
-                      color: isDarkMode ? '#F8FAFC' : '#0F172A',
-                    }}
-                  />
-                  <Area type="monotone" dataKey="appointments" stroke="#0EA5E9" fillOpacity={1} fill="url(#colorAppointments)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </motion.div>
-
-            {/* Revenue Trend Chart */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="premium-card p-6"
-            >
-              <h3 className="text-xl font-bold dark:text-slate-50 text-slate-900 mb-6">Revenue Trend</h3>
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={analyticsData.revenueTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#334155' : '#E2E8F0'} />
-                  <XAxis dataKey="month" stroke={isDarkMode ? '#94A3B8' : '#64748B'} />
-                  <YAxis stroke={isDarkMode ? '#94A3B8' : '#64748B'} />
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                      border: `1px solid ${isDarkMode ? '#334155' : '#E2E8F0'}`,
-                      borderRadius: '12px',
-                      color: isDarkMode ? '#F8FAFC' : '#0F172A',
-                    }}
-                  />
-                  <Line type="monotone" dataKey="revenue" stroke="#06B6D4" strokeWidth={3} dot={{ fill: '#06B6D4', strokeWidth: 2, r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
             </motion.div>
           </div>
         </div>
@@ -1063,11 +881,11 @@ const LandingPage = () => {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="p-4 bg-gradient-primary rounded-xl">
-                    <Mail className="w-6 h-6 text-white" />
+                    <Phone className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <p className="dark:text-slate-400 text-slate-600 text-sm">Email</p>
-                    <p className="dark:text-slate-50 text-slate-900 font-semibold">Group40fourty@gmail.com</p>
+                    <p className="dark:text-slate-400 text-slate-600 text-sm">Support Phone</p>
+                    <p className="dark:text-slate-50 text-slate-900 font-semibold">+252 614 197 803</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
@@ -1109,11 +927,11 @@ const LandingPage = () => {
                       />
                     </div>
                     <div>
-                      <label className="block dark:text-slate-300 text-slate-700 font-semibold mb-2">Email</label>
+                      <label className="block dark:text-slate-300 text-slate-700 font-semibold mb-2">Phone Number</label>
                       <input
-                        type="email"
-                        value={contactForm.email}
-                        onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                        type="tel"
+                        value={contactForm.phone}
+                        onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
                         className="premium-input"
                         required
                       />
@@ -1170,10 +988,10 @@ const LandingPage = () => {
             <div>
               <h3 className="text-lg font-bold mb-6">Company</h3>
               <ul className="space-y-3">
-                <li><Link to="/" className="text-slate-400 hover:text-white transition-colors">Home</Link></li>
-                <li><Link to="#doctors" className="text-slate-400 hover:text-white transition-colors">Doctors</Link></li>
-                <li><Link to="#features" className="text-slate-400 hover:text-white transition-colors">Features</Link></li>
-                <li><Link to="#how-it-works" className="text-slate-400 hover:text-white transition-colors">How It Works</Link></li>
+                <li><button type="button" onClick={() => scrollToSection('home')} className="text-slate-400 hover:text-white transition-colors">Home</button></li>
+                <li><button type="button" onClick={() => scrollToSection('doctors')} className="text-slate-400 hover:text-white transition-colors">Doctors</button></li>
+                <li><button type="button" onClick={() => scrollToSection('features')} className="text-slate-400 hover:text-white transition-colors">Features</button></li>
+                <li><button type="button" onClick={() => scrollToSection('how-it-works')} className="text-slate-400 hover:text-white transition-colors">How It Works</button></li>
               </ul>
             </div>
 
@@ -1190,7 +1008,7 @@ const LandingPage = () => {
             <div>
               <h3 className="text-lg font-bold mb-6">Support</h3>
               <ul className="space-y-3">
-                <li><Link to="#contact" className="text-slate-400 hover:text-white transition-colors">Contact Us</Link></li>
+                <li><button type="button" onClick={() => scrollToSection('contact')} className="text-slate-400 hover:text-white transition-colors">Contact Us</button></li>
                 <li><Link to="#" className="text-slate-400 hover:text-white transition-colors">Privacy Policy</Link></li>
                 <li><Link to="#" className="text-slate-400 hover:text-white transition-colors">Terms & Conditions</Link></li>
                 <li><Link to="#" className="text-slate-400 hover:text-white transition-colors">FAQ</Link></li>

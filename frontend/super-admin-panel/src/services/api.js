@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-const defaultApiUrl = import.meta.env.DEV ? '/api' : 'http://127.0.0.1:5000/api';
-const apiBaseUrl = import.meta.env.DEV ? '/api' : import.meta.env.VITE_API_BASE_URL || defaultApiUrl;
+const apiBaseUrl = (import.meta.env.DEV ? '/api' : import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
 const axiosInstance = axios.create({
   baseURL: apiBaseUrl,
@@ -11,6 +10,8 @@ const axiosInstance = axios.create({
   },
 });
 
+// Central IT Management API client. Every request uses the super-admin token
+// and backend role checks still enforce server-side access.
 const formatAxiosError = (error) => {
   if (!error) return 'Unknown error occurred.';
   if (error.response) {
@@ -31,7 +32,6 @@ axiosInstance.interceptors.request.use(
         Authorization: `Bearer ${token}`,
       };
     }
-    console.log(`📤 API Request: ${config.method.toUpperCase()} ${config.url}`);
     return config;
   },
   (error) => {
@@ -41,10 +41,7 @@ axiosInstance.interceptors.request.use(
 );
 
 axiosInstance.interceptors.response.use(
-  (response) => {
-    console.log(`📥 API Response: ${response.status} ${response.config.url}`);
-    return response;
-  },
+  (response) => response,
   (error) => {
     if (error.response) {
       console.error(`❌ API Error ${error.response.status}:`, error.response.data);

@@ -1,45 +1,59 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import Login from '../pages/auth/Login.jsx';
-import Splash from '../pages/Splash.jsx';
-import LandingPage from '../pages/LandingPage.jsx';
-import UserDashboard from '../pages/user/Dashboard.jsx';
-import AdminDashboard from '../pages/admin/Dashboard.jsx';
-import Assessment from '../pages/user/Assessment.jsx';
-import ResultPage from '../pages/user/ResultPage.jsx';
-import DoctorsPage from '../pages/user/DoctorsPage.jsx';
-import BookingPage from '../pages/user/BookingPage.jsx';
-import SuccessPage from '../pages/user/SuccessPage.jsx';
-import Appointments from '../pages/user/Appointments.jsx';
-import AdminDoctors from '../pages/admin/Doctors.jsx';
-import Payment from '../pages/shared/Payment.jsx';
-import History from '../pages/shared/History.jsx';
-import Profile from '../pages/shared/Profile.jsx';
-import AdminUsers from '../pages/admin/Users.jsx';
-import AdminAppointments from '../pages/admin/Appointments.jsx';
-import AdminPayments from '../pages/admin/Payments.jsx';
-import AdminNotifications from '../pages/admin/Notifications.jsx';
-import AdminReports from '../pages/admin/Reports.jsx';
-import AdminSettings from '../pages/admin/Settings.jsx';
-import NotFound from '../pages/shared/NotFound.jsx';
 import DashboardLayout from '../layouts/DashboardLayout.jsx';
-import NotificationsPage from '../pages/user/Notifications.jsx';
-import DoctorDashboard from '../pages/doctor/DoctorDashboard.jsx';
-import DoctorAppointments from '../pages/doctor/DoctorAppointments.jsx';
-import DoctorPatients from '../pages/doctor/DoctorPatients.jsx';
-import DoctorPredictions from '../pages/doctor/DoctorPredictions.jsx';
-import DoctorProfile from '../pages/doctor/DoctorProfile.jsx';
-import DoctorSchedule from '../pages/doctor/DoctorSchedule.jsx';
-import DoctorSettings from '../pages/doctor/DoctorSettings.jsx';
-import DoctorReports from '../pages/doctor/DoctorReports.jsx';
 import ProtectedRoute from './ProtectedRoute.jsx';
+
+const Login = lazy(() => import('../pages/auth/Login.jsx'));
+const Splash = lazy(() => import('../pages/Splash.jsx'));
+const LandingPage = lazy(() => import('../pages/LandingPage.jsx'));
+const UserDashboard = lazy(() => import('../pages/user/Dashboard.jsx'));
+const AdminDashboard = lazy(() => import('../pages/admin/Dashboard.jsx'));
+const Assessment = lazy(() => import('../pages/user/Assessment.jsx'));
+const ResultPage = lazy(() => import('../pages/user/ResultPage.jsx'));
+const DoctorsPage = lazy(() => import('../pages/user/DoctorsPage.jsx'));
+const BookingPage = lazy(() => import('../pages/user/BookingPage.jsx'));
+const SuccessPage = lazy(() => import('../pages/user/SuccessPage.jsx'));
+const Appointments = lazy(() => import('../pages/user/Appointments.jsx'));
+const AdminDoctors = lazy(() => import('../pages/admin/Doctors.jsx'));
+const AdminDoctorPasswords = lazy(() => import('../pages/admin/DoctorPasswords.jsx'));
+const Payment = lazy(() => import('../pages/shared/Payment.jsx'));
+const History = lazy(() => import('../pages/shared/History.jsx'));
+const Profile = lazy(() => import('../pages/shared/Profile.jsx'));
+const AdminUsers = lazy(() => import('../pages/admin/Users.jsx'));
+const AdminAppointments = lazy(() => import('../pages/admin/Appointments.jsx'));
+const AdminEmergencyExtensions = lazy(() => import('../pages/admin/EmergencyExtensions.jsx'));
+const AdminPayments = lazy(() => import('../pages/admin/Payments.jsx'));
+const AdminRefundRequests = lazy(() => import('../pages/admin/RefundRequests.jsx'));
+const AdminPredictions = lazy(() => import('../pages/admin/Predictions.jsx'));
+const AdminDoctorSchedules = lazy(() => import('../pages/admin/DoctorSchedules.jsx'));
+const AdminNotifications = lazy(() => import('../pages/admin/Notifications.jsx'));
+const AdminReports = lazy(() => import('../pages/admin/Reports.jsx'));
+const AdminDoctorReviews = lazy(() => import('../pages/admin/DoctorReviews.jsx'));
+const NotFound = lazy(() => import('../pages/shared/NotFound.jsx'));
+const NotificationsPage = lazy(() => import('../pages/user/Notifications.jsx'));
+const DoctorDashboard = lazy(() => import('../pages/doctor/DoctorDashboard.jsx'));
+const DoctorAppointments = lazy(() => import('../pages/doctor/DoctorAppointments.jsx'));
+const DoctorPayments = lazy(() => import('../pages/doctor/DoctorPayments.jsx'));
+const DoctorPatients = lazy(() => import('../pages/doctor/DoctorPatients.jsx'));
+const DoctorPredictions = lazy(() => import('../pages/doctor/DoctorPredictions.jsx'));
+const DoctorSchedule = lazy(() => import('../pages/doctor/DoctorSchedule.jsx'));
+const DoctorReports = lazy(() => import('../pages/doctor/DoctorReports.jsx'));
+const DoctorReviews = lazy(() => import('../pages/doctor/DoctorReviews.jsx'));
+
+const PageFallback = () => (
+  <div className="min-h-screen bg-slate-50 dark:bg-[#0F172A] flex items-center justify-center text-sm text-slate-500 dark:text-[#CBD5E1]">
+    Loading...
+  </div>
+);
 
 function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/splash" element={<Splash />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Navigate to="/login" replace />} />
+    <Suspense fallback={<PageFallback />}>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/splash" element={<Splash />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Navigate to="/login" replace />} />
 
       <Route
         path="/user"
@@ -77,12 +91,14 @@ function AppRoutes() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<DoctorDashboard />} />
         <Route path="appointments" element={<DoctorAppointments />} />
+        <Route path="payments" element={<DoctorPayments />} />
         <Route path="patients" element={<DoctorPatients />} />
         <Route path="predictions" element={<DoctorPredictions />} />
         <Route path="schedule" element={<DoctorSchedule />} />
         <Route path="reports" element={<DoctorReports />} />
-        <Route path="profile" element={<DoctorProfile />} />
-        <Route path="settings" element={<DoctorSettings />} />
+        <Route path="reviews" element={<DoctorReviews />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="notifications" element={<NotificationsPage />} />
       </Route>
 
       <Route
@@ -97,16 +113,22 @@ function AppRoutes() {
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="doctors" element={<AdminDoctors />} />
+        <Route path="doctor-passwords" element={<AdminDoctorPasswords />} />
         <Route path="appointments" element={<AdminAppointments />} />
+        <Route path="emergency-extensions" element={<AdminEmergencyExtensions />} />
         <Route path="payments" element={<AdminPayments />} />
-        <Route path="notifications" element={<AdminNotifications />} />
+        <Route path="refund-requests" element={<AdminRefundRequests />} />
+        <Route path="predictions" element={<AdminPredictions />} />
+        <Route path="doctor-schedules" element={<AdminDoctorSchedules />} />
         <Route path="reports" element={<AdminReports />} />
-        <Route path="settings" element={<AdminSettings />} />
+        <Route path="doctor-reviews" element={<AdminDoctorReviews />} />
+        <Route path="notifications" element={<AdminNotifications />} />
         <Route path="profile" element={<Profile />} />
       </Route>
 
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 }
 

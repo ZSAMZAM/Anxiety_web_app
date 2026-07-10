@@ -45,14 +45,19 @@ function DoctorPatients() {
       console.error('Failed to load patient history:', err);
     }
 
-    // Load patient predictions
-    try {
-      const predictions = await api.getPredictionHistory();
-      setPatientPredictions(predictions || []);
-    } catch (err) {
-      console.error('Failed to load patient predictions:', err);
-      setPatientPredictions([]);
-    }
+    const predictions = appointments
+      .filter((appointment) => appointment.user_id === patient.user_id && appointment.prediction_result)
+      .map((appointment) => ({
+        id: appointment.prediction_id || appointment.id,
+        anxietyLevel: appointment.prediction_result,
+        confidence: appointment.prediction_confidence != null
+          ? Math.round(Number(appointment.prediction_confidence) > 1 ? Number(appointment.prediction_confidence) : Number(appointment.prediction_confidence) * 100)
+          : 0,
+        date: appointment.created_at || appointment.appointment_date,
+        summary: appointment.prediction_recommendation || `Detected ${appointment.prediction_result}.`,
+        sharingStatus: 'shared_with_doctor',
+      }));
+    setPatientPredictions(predictions);
   };
 
   const handleSaveNotes = async () => {
@@ -77,8 +82,13 @@ function DoctorPatients() {
         map[appointment.user_id] = {
           user_id: appointment.user_id,
           name: appointment.patient_name || 'Unknown',
-          email: appointment.patient_email || 'Unknown',
+          phone: appointment.patient_phone || appointment.phone || 'No phone number',
           lastAppointment: appointment.appointment_date,
+          latestPrediction: appointment.prediction_result || 'Not recorded',
+          riskLevel: appointment.risk_level || 'Not recorded',
+          assessmentDate: appointment.created_at || appointment.appointment_date,
+          paymentStatus: appointment.payment_status || 'Paid',
+          consultationStatus: appointment.status || 'Confirmed',
           upcoming: appointment.status !== 'Rejected' ? 1 : 0,
           appointments: 1,
         };
@@ -86,6 +96,11 @@ function DoctorPatients() {
         map[appointment.user_id].appointments += 1;
         if (appointment.appointment_date > (map[appointment.user_id].lastAppointment || '')) {
           map[appointment.user_id].lastAppointment = appointment.appointment_date;
+          map[appointment.user_id].latestPrediction = appointment.prediction_result || map[appointment.user_id].latestPrediction;
+          map[appointment.user_id].riskLevel = appointment.risk_level || map[appointment.user_id].riskLevel;
+          map[appointment.user_id].assessmentDate = appointment.created_at || appointment.appointment_date || map[appointment.user_id].assessmentDate;
+          map[appointment.user_id].paymentStatus = appointment.payment_status || map[appointment.user_id].paymentStatus;
+          map[appointment.user_id].consultationStatus = appointment.status || map[appointment.user_id].consultationStatus;
         }
         if (appointment.status !== 'Rejected') {
           map[appointment.user_id].upcoming += 1;
@@ -97,10 +112,10 @@ function DoctorPatients() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-[#0B1120] text-slate-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading patients…</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#06B6D4] mx-auto"></div>
+          <p className="mt-4 text-slate-300">Loading patients…</p>
         </div>
       </div>
     );
@@ -111,8 +126,8 @@ function DoctorPatients() {
       <SectionHeader subtitle="Doctor patients" title="View your patient list and appointment history." />
 
       {error && (
-        <div className="rounded-[2rem] border border-red-200 bg-red-50 p-6 shadow-sm">
-          <p className="text-sm text-red-800">{error}</p>
+        <div className="rounded-[2rem] border border-red-800 bg-[#111827] p-6 shadow-sm">
+          <p className="text-sm text-red-200">{error}</p>
         </div>
       )}
 
@@ -122,22 +137,26 @@ function DoctorPatients() {
             <div 
               key={patient.user_id} 
               onClick={() => handleViewPatient(patient)}
-              className="rounded-[2rem] border border-slate-200/70 bg-white/90 p-6 shadow-xl backdrop-blur-xl transition-colors duration-300 dark:border-slate-700 dark:bg-slate-900/60 cursor-pointer hover:border-cyan-400 hover:shadow-2xl"
+              className="rounded-[2rem] border border-[#334155] bg-[#1E293B] p-6 shadow-xl transition-colors duration-300 hover:border-[#06B6D4] hover:shadow-2xl cursor-pointer"
             >
-              <p className="text-sm uppercase tracking-[0.35em] text-sky-600">{patient.name}</p>
-              <h3 className="mt-3 text-2xl font-semibold text-slate-900 dark:text-slate-100">{patient.email}</h3>
-              <div className="mt-6 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-                <p>Appointments: <span className="font-semibold text-slate-900 dark:text-slate-100">{patient.appointments}</span></p>
-                <p>Upcoming: <span className="font-semibold text-slate-900 dark:text-slate-100">{patient.upcoming}</span></p>
-                <p>Last booked: <span className="font-semibold text-slate-900 dark:text-slate-100">{patient.lastAppointment || 'Unknown'}</span></p>
+              <p className="text-sm uppercase tracking-[0.35em] text-[#06B6D4]">{patient.name}</p>
+              <h3 className="mt-3 text-2xl font-semibold text-slate-100">{patient.phone}</h3>
+              <div className="mt-6 space-y-3 text-sm text-slate-300">
+                <p>Appointments: <span className="font-semibold text-slate-100">{patient.appointments}</span></p>
+                <p>Upcoming: <span className="font-semibold text-slate-100">{patient.upcoming}</span></p>
+                <p>Last booked: <span className="font-semibold text-slate-100">{patient.lastAppointment || 'Unknown'}</span></p>
+                <p>Prediction: <span className="font-semibold text-slate-100">{patient.latestPrediction}</span></p>
+                <p>Risk: <span className="font-semibold text-slate-100">{patient.riskLevel}</span></p>
+                <p>Payment: <span className="font-semibold text-slate-100">{patient.paymentStatus}</span></p>
+                <p>Consultation: <span className="font-semibold text-slate-100">{patient.consultationStatus}</span></p>
               </div>
-              <button className="mt-6 w-full rounded-3xl bg-gradient-to-r from-cyan-500 to-sky-500 px-4 py-3 text-sm font-semibold text-white transition hover:from-cyan-600 hover:to-sky-600">
+              <button className="mt-6 w-full rounded-3xl bg-gradient-to-r from-[#06B6D4] to-[#0EA5E9] px-4 py-3 text-sm font-semibold text-white transition hover:from-[#0CA7D8] hover:to-[#0284C7]">
                 View Details
               </button>
             </div>
           ))
         ) : (
-          <div className="rounded-[2rem] border border-slate-200 bg-white/80 p-8 text-center text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+          <div className="rounded-[2rem] border border-[#334155] bg-[#111827] p-8 text-center text-slate-300 shadow-sm">
             <p>No patient records available yet.</p>
           </div>
         )}
@@ -146,12 +165,12 @@ function DoctorPatients() {
       {/* Patient Details Modal */}
       {showModal && selectedPatient && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto dark:border-slate-700 dark:bg-slate-900">
+          <div className="rounded-[2rem] border border-[#334155] bg-[#111827] p-8 shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Patient Details</h2>
               <button 
                 onClick={() => setShowModal(false)}
-                className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                className="text-slate-400 hover:text-slate-100"
               >
                 <FiX className="h-6 w-6" />
               </button>
@@ -163,9 +182,14 @@ function DoctorPatients() {
                 <p className="text-sm uppercase tracking-[0.35em] text-sky-600">Patient Information</p>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <p><span className="font-semibold text-slate-900 dark:text-slate-100">Name:</span> {selectedPatient.name}</p>
-                  <p><span className="font-semibold text-slate-900 dark:text-slate-100">Email:</span> {selectedPatient.email}</p>
+                  <p><span className="font-semibold text-slate-900 dark:text-slate-100">Phone Number:</span> {selectedPatient.phone}</p>
                   <p><span className="font-semibold text-slate-900 dark:text-slate-100">Total Appointments:</span> {selectedPatient.appointments}</p>
                   <p><span className="font-semibold text-slate-900 dark:text-slate-100">Upcoming:</span> {selectedPatient.upcoming}</p>
+                  <p><span className="font-semibold text-slate-900 dark:text-slate-100">Prediction:</span> {selectedPatient.latestPrediction}</p>
+                  <p><span className="font-semibold text-slate-900 dark:text-slate-100">Risk Level:</span> {selectedPatient.riskLevel}</p>
+                  <p><span className="font-semibold text-slate-900 dark:text-slate-100">Assessment Date:</span> {selectedPatient.assessmentDate || 'Unknown'}</p>
+                  <p><span className="font-semibold text-slate-900 dark:text-slate-100">Payment Status:</span> {selectedPatient.paymentStatus}</p>
+                  <p><span className="font-semibold text-slate-900 dark:text-slate-100">Consultation Status:</span> {selectedPatient.consultationStatus}</p>
                 </div>
               </div>
 
@@ -236,7 +260,7 @@ function DoctorPatients() {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add notes about this patient..."
                   rows={4}
-                  className="mt-4 w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-cyan-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  className="mt-4 w-full rounded-3xl border border-[#334155] bg-[#111827] px-4 py-3 text-slate-100 outline-none transition focus:border-[#06B6D4]"
                 />
                 <button
                   onClick={handleSaveNotes}

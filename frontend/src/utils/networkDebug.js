@@ -3,8 +3,7 @@
  * Helps diagnose API connection issues
  */
 
-const defaultApiUrl = import.meta.env.DEV ? '/api' : 'http://127.0.0.1:5000/api';
-const API_BASE_URL = (import.meta.env.DEV ? '/api' : import.meta.env.VITE_API_BASE_URL || defaultApiUrl).replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.DEV ? '/api' : import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 const buildUrl = (path) => `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 
 export const networkDebug = {
@@ -22,7 +21,6 @@ export const networkDebug = {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Backend connection: OK', data);
         return {
           connected: true,
           status: data,
@@ -58,7 +56,6 @@ export const networkDebug = {
   testEndpoint: async (endpoint) => {
     try {
       const url = buildUrl(endpoint);
-      console.log(`🧪 Testing endpoint: ${url}`);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -70,7 +67,6 @@ export const networkDebug = {
 
       const data = await response.json();
 
-      console.log(`Response: ${response.status}`, data);
       return {
         success: response.ok,
         status: response.status,
@@ -98,28 +94,12 @@ export const networkDebug = {
   },
 
   /**
-   * Log all debug info for troubleshooting
+   * Return debug info for troubleshooting screens without writing to console.
    */
   logDebugInfo: async () => {
-    console.log('\n' + '='.repeat(60));
-    console.log('🔍 Network Debug Info');
-    console.log('='.repeat(60));
-    
-    console.log('\n📋 Configuration:');
     const config = networkDebug.getConfig();
-    console.table(config);
-
-    console.log('\n🧪 Backend Connection:');
     const connectionStatus = await networkDebug.checkBackendConnection();
-    console.table(connectionStatus);
-
-    if (connectionStatus.solutions) {
-      console.log('\n💡 Suggested fixes:');
-      connectionStatus.solutions.forEach((solution) => console.log(solution));
-    }
-
-    console.log('\n' + '='.repeat(60) + '\n');
-    return connectionStatus;
+    return { config, connectionStatus };
   },
 };
 

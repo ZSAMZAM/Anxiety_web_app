@@ -10,7 +10,7 @@ function ThemeToggle({ className = '' }) {
       type="button"
       onClick={toggleTheme}
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition-colors duration-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 ${className}`}
+      className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[#E4ECF4] bg-[#EAF7FB] text-[#0F8EA8] transition-colors duration-200 hover:bg-[#DDF3F8] focus:outline-none focus:ring-2 focus:ring-[#14B8A6] dark:border-white/10 dark:bg-white/8 dark:text-[#38BDF8] dark:hover:bg-white/12 ${className}`}
     >
       {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
     </button>

@@ -15,11 +15,32 @@ function Booking() {
   const selectedDoctorFromState = location.state?.doctor;
 
   useEffect(() => {
-    api.getDoctors().then((data) => {
-      setDoctors(data);
-      const preferredDoctor = selectedDoctorFromState || (doctorId ? data.find((doctor) => doctor.id === Number(doctorId)) : null);
-      setSelectedDoctor(preferredDoctor || data[0]);
-    });
+    let active = true;
+    api.getAssessmentBookingState()
+      .then((state) => {
+        if (!active) return;
+        if (!state.canBookTherapist) {
+          setError(state.bookingMessage);
+          navigate(state.hasAssessment ? '/user/history' : '/user/assessment', {
+            replace: true,
+            state: { message: state.bookingMessage },
+          });
+          return;
+        }
+        return api.getDoctors().then((data) => {
+          if (!active) return;
+          setDoctors(data);
+          const preferredDoctor = selectedDoctorFromState || (doctorId ? data.find((doctor) => doctor.id === Number(doctorId)) : null);
+          setSelectedDoctor(preferredDoctor || data[0]);
+        });
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err?.response?.data?.message || err?.response?.data?.error || err.message || 'Unable to verify assessment status.');
+      });
+    return () => {
+      active = false;
+    };
   }, [doctorId, selectedDoctorFromState]);
 
   const handleSubmit = async (event) => {
@@ -28,6 +49,16 @@ function Booking() {
     setError(null);
 
     try {
+      const state = await api.getAssessmentBookingState();
+      if (!state.canBookTherapist) {
+        setError(state.bookingMessage);
+        navigate(state.hasAssessment ? '/user/history' : '/user/assessment', {
+          replace: true,
+          state: { message: state.bookingMessage },
+        });
+        setLoading(false);
+        return;
+      }
       const bookingResponse = await api.bookAppointment({
         doctor_name: selectedDoctor?.name,
         appointment_date: form.date,
@@ -60,7 +91,7 @@ function Booking() {
       });
     } catch (err) {
       console.error('Booking failed:', err);
-      setError(err?.response?.data?.error || err.message || 'Failed to create booking. Please try again.');
+      setError(err?.response?.data?.message || err?.response?.data?.error || err.message || 'Failed to create booking. Please try again.');
       setLoading(false);
     }
   };
@@ -75,7 +106,13 @@ function Booking() {
               {selectedDoctor ? (
                 <>
                   <div className="flex items-center gap-4">
-                    <img src={selectedDoctor.photo} alt={selectedDoctor.name} className="h-16 w-16 rounded-3xl object-cover shadow-lg" />
+                    <Avatar
+                      src={selectedDoctor.photo || selectedDoctor.image || selectedDoctor.avatar}
+                      name={selectedDoctor.name}
+                      role="doctor"
+                      size="xl"
+                      className="shadow-lg"
+                    />
                     <div>
                       <h3 className="text-xl font-semibold text-gray-900">{selectedDoctor.name}</h3>
                       <p className="text-sm text-gray-500">{selectedDoctor.specialization}</p>

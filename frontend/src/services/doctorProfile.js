@@ -33,7 +33,7 @@ const defaultSchedule = {
 const defaultSettings = {
   appointmentAlerts: true,
   patientUpdates: true,
-  emailPreferences: true,
+  smsPreferences: true,
   darkMode: false,
   loginHistory: [
     { id: 1, device: 'Chrome on Windows', time: 'Today • 08:34 AM' },

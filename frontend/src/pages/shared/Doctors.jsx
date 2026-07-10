@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiSearch, FiPlus, FiTrash2, FiEdit3, FiCheckCircle } from 'react-icons/fi';
 import SectionHeader from '../../components/SectionHeader.jsx';
+import Avatar from '../../components/Avatar.jsx';
 import { api } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -98,7 +99,13 @@ function Doctors() {
             {filtered.map((doctor) => (
               <div key={doctor.id} className="rounded-[2rem] border border-white/20 bg-white/10 p-6 shadow-xl backdrop-blur-xl">
                 <div className="flex items-center gap-4">
-                  <img src={doctor.photo || doctor.image || ''} alt={doctor.name} className="h-16 w-16 rounded-3xl object-cover shadow-lg" />
+                  <Avatar
+                    src={doctor.photo || doctor.image || doctor.avatar}
+                    name={doctor.name}
+                    role="doctor"
+                    size="xl"
+                    className="shadow-lg"
+                  />
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900">{doctor.name}</h3>
                     <p className="text-sm text-gray-500">{doctor.specialization}</p>

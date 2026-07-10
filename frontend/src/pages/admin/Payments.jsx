@@ -18,6 +18,9 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
+  LabelList,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -28,7 +31,7 @@ import {
 import SectionHeader from '../../components/SectionHeader.jsx';
 import { api } from '../../services/api.js';
 
-const paymentStatuses = ['all', 'Completed', 'Pending', 'Failed', 'Refunded'];
+const paymentStatuses = ['all', 'Paid', 'Completed', 'Pending', 'Failed', 'Partial Refund', 'Refunded'];
 const serviceStatuses = ['all', 'Waiting', 'Verified', 'Follow Up Required', 'Refunded', 'Cancelled'];
 
 function AdminPayments() {
@@ -45,7 +48,7 @@ function AdminPayments() {
     service_verified: true,
     verification_notes: '',
   });
-  const [refundForm, setRefundForm] = useState({ reason: '', notes: '', decision: 'approve' });
+  const [refundForm, setRefundForm] = useState({ reason: '', notes: '', decision: 'approve', refund_amount: '' });
   const [filters, setFilters] = useState({
     search: '',
     status: 'all',
@@ -108,10 +111,46 @@ function AdminPayments() {
   }, [payments]);
 
   const summary = stats?.summary || {};
+  const totalRevenue = summary?.totalRevenue || 0;
+  const paymentMethodColors = {
+    wafi: '#0EA5E9',
+    'evc plus': '#0EA5E9',
+    zaad: '#22C55E',
+    sahal: '#F97316',
+    edahab: '#A855F7',
+    bank: '#06B6D4',
+    mwallet: '#EC4899',
+    'mwallet account': '#EC4899',
+  };
+  const getMethodColor = (method) => paymentMethodColors[String(method).toLowerCase()] || '#6366f1';
+  const formatMonthName = (monthValue) => {
+    if (!monthValue) return monthValue;
+    const [year, month] = String(monthValue).split('-');
+    if (!year || !month) return monthValue;
+    const date = new Date(`${year}-${month}-01T00:00:00`);
+    if (Number.isNaN(date.getTime())) return monthValue;
+    return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  };
+  const revenueByDayData = stats?.daily_revenue || [];
+  const revenueByMethodData = stats?.revenue_by_method || [];
+  const monthlyRevenueData = (stats?.monthly_revenue || []).map((item) => ({
+    ...item,
+    displayMonth: formatMonthName(item.month),
+  }));
+  const monthlyTotalRevenue = monthlyRevenueData.reduce((sum, item) => sum + Number(item.revenue || 0), 0);
+  const latestMonth = monthlyRevenueData[monthlyRevenueData.length - 1] || null;
+  const previousMonth = monthlyRevenueData[monthlyRevenueData.length - 2] || null;
+  const monthOverMonthChange = previousMonth
+    ? ((Number(latestMonth.revenue || 0) - Number(previousMonth.revenue || 0)) / Number(previousMonth.revenue || 1)) * 100
+    : null;
   const summaryCards = [
-    ['Total Revenue', money(summary.totalRevenue), FiDollarSign, 'from-emerald-500 to-teal-500'],
+    ['Gross Revenue', money(summary.grossRevenue), FiDollarSign, 'from-emerald-500 to-teal-500'],
+    ['Net Revenue', money(summary.netRevenue), FiTrendingUp, 'from-blue-500 to-cyan-500'],
+    ['Total Refunded', money(summary.totalRefunded), FiRefreshCw, 'from-rose-500 to-red-500'],
     ["Today's Revenue", money(summary.todayRevenue), FiTrendingUp, 'from-cyan-500 to-blue-500'],
+    ['This Week Revenue', money(summary.weekRevenue), FiTrendingUp, 'from-sky-500 to-indigo-500'],
     ['This Month Revenue', money(summary.monthRevenue), FiTrendingUp, 'from-indigo-500 to-violet-500'],
+    ['This Year Revenue', money(summary.yearRevenue), FiTrendingUp, 'from-violet-500 to-fuchsia-500'],
     ['Completed Payments', summary.successfulPayments || 0, FiCheck, 'from-green-500 to-emerald-500'],
     ['Pending Payments', summary.pendingPayments || 0, FiClock, 'from-amber-500 to-orange-500'],
     ['Failed Payments', summary.failedPayments || 0, FiX, 'from-red-500 to-rose-500'],
@@ -162,6 +201,8 @@ function AdminPayments() {
       'Appointment ID',
       'Booking ID',
       'Amount',
+      'Refund Amount',
+      'Net Amount',
       'Currency',
       'Payment Method',
       'Provider Name',
@@ -182,6 +223,8 @@ function AdminPayments() {
       payment.appointment_id || '',
       payment.booking_id || '',
       payment.amount || 0,
+      payment.refund_amount || 0,
+      payment.net_amount || 0,
       payment.currency || '',
       payment.payment_method || '',
       payment.provider_name || '',
@@ -227,24 +270,37 @@ function AdminPayments() {
 
       <div className="grid gap-5 xl:grid-cols-3">
         <ChartCard title="Revenue by Day" className="xl:col-span-2">
+          <div className="mb-4 rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            <p className="text-slate-500 dark:text-slate-400">Total Revenue</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">{money(totalRevenue)}</p>
+          </div>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={stats?.daily_revenue || []}>
+            <LineChart data={revenueByDayData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip formatter={(value) => money(value)} />
-              <Line type="monotone" dataKey="revenue" stroke="#06b6d4" strokeWidth={3} />
+              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+              <YAxis tickFormatter={(value) => money(value)} />
+              <Tooltip formatter={(value) => money(value)} labelFormatter={(label) => `Date: ${label}`} />
+              <Legend verticalAlign="top" align="right" iconType="circle" />
+              <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#06b6d4" strokeWidth={3} dot={{ fill: '#0EA5E9', strokeWidth: 2, r: 5 }}>
+                <LabelList dataKey="revenue" position="top" fill="#0f172a" style={{ fontSize: 12, fontWeight: 600 }} formatter={(value) => money(value)} />
+              </Line>
             </LineChart>
           </ResponsiveContainer>
         </ChartCard>
         <ChartCard title="Revenue by Payment Method">
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={stats?.revenue_by_method || []}>
+            <BarChart data={revenueByMethodData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="method" />
-              <YAxis />
+              <XAxis dataKey="method" tick={{ fontSize: 12 }} />
+              <YAxis tickFormatter={(value) => money(value)} />
               <Tooltip formatter={(value) => money(value)} />
-              <Bar dataKey="revenue" fill="#4f46e5" radius={[8, 8, 0, 0]} />
+              <Legend verticalAlign="top" align="right" iconType="square" />
+              <Bar dataKey="revenue" name="Revenue" radius={[8, 8, 0, 0]}>
+                {revenueByMethodData.map((entry, index) => (
+                  <Cell key={`cell-${entry.method}-${index}`} fill={getMethodColor(entry.method)} />
+                ))}
+                <LabelList dataKey="revenue" position="top" fill="#111827" style={{ fontSize: 12, fontWeight: 600 }} formatter={(value) => money(value)} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -294,7 +350,7 @@ function AdminPayments() {
               <table className="min-w-[1500px] text-left text-sm">
                 <thead className="border-y border-gray-200 text-xs uppercase text-gray-500 dark:border-slate-700">
                   <tr>
-                    {['Payment ID', 'Transaction ID', 'Reference ID', 'Invoice ID', 'Provider Txn', 'User', 'Phone', 'Doctor', 'Appointment', 'Booking', 'Amount', 'Method', 'Provider', 'Payment', 'Paid Date', 'Service', 'Created', 'Actions'].map((header) => (
+                    {['Payment ID', 'Transaction ID', 'Reference ID', 'Invoice ID', 'Provider Txn', 'User', 'Phone', 'Doctor', 'Appointment', 'Booking', 'Gross', 'Refund', 'Net', 'Method', 'Provider', 'Payment', 'Failure Reason', 'Paid Date', 'Service', 'Created', 'Actions'].map((header) => (
                       <th key={header} className="px-3 py-3">{header}</th>
                     ))}
                   </tr>
@@ -313,9 +369,12 @@ function AdminPayments() {
                       <td className="px-3 py-3">{empty(payment.appointment_id)}</td>
                       <td className="px-3 py-3">{empty(payment.booking_id)}</td>
                       <td className="px-3 py-3 font-semibold">{money(payment.amount)} {payment.currency || 'USD'}</td>
+                      <td className="px-3 py-3 text-red-600">{money(payment.refund_amount)}</td>
+                      <td className="px-3 py-3 font-semibold text-emerald-600">{money(payment.net_amount)}</td>
                       <td className="px-3 py-3">{empty(payment.payment_method)}</td>
                       <td className="px-3 py-3">{empty(payment.provider_name)}</td>
                       <td className="px-3 py-3"><Badge value={payment.payment_status} /></td>
+                      <td className="px-3 py-3 max-w-xs truncate">{empty(payment.failure_reason)}</td>
                       <td className="px-3 py-3">{dateTime(payment.paid_at)}</td>
                       <td className="px-3 py-3"><Badge value={payment.service_status} /></td>
                       <td className="px-3 py-3">{dateTime(payment.created_at)}</td>
@@ -360,13 +419,48 @@ function AdminPayments() {
 
       <div className="grid gap-5 xl:grid-cols-2">
         <ChartCard title="Revenue by Month">
+          <div className="mb-4 rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Total Revenue</p>
+                <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">{money(monthlyTotalRevenue)}</p>
+              </div>
+              <div className="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+                {previousMonth && latestMonth && (
+                  <p>{previousMonth.displayMonth}: {money(previousMonth.revenue)}</p>
+                )}
+                {latestMonth && (
+                  <p>{latestMonth.displayMonth}: {money(latestMonth.revenue)}</p>
+                )}
+                <p className="font-semibold text-slate-900 dark:text-slate-100">
+                  Change: {monthOverMonthChange === null ? 'N/A' : `${monthOverMonthChange.toFixed(1)}%`}
+                </p>
+              </div>
+            </div>
+          </div>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={stats?.monthly_revenue || []}>
+            <LineChart data={monthlyRevenueData}>
+              <defs>
+                <linearGradient id="monthlyRevenueGradient" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#8b5cf6" />
+                  <stop offset="100%" stopColor="#0EA5E9" />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip formatter={(value) => money(value)} />
-              <Line type="monotone" dataKey="revenue" stroke="#8b5cf6" strokeWidth={3} />
+              <XAxis dataKey="displayMonth" tick={{ fontSize: 12 }} />
+              <YAxis tickFormatter={(value) => money(value)} />
+              <Tooltip formatter={(value) => money(value)} labelFormatter={(label) => `${label}`} />
+              <Legend verticalAlign="top" align="right" iconType="circle" />
+              <Line
+                type="monotone"
+                dataKey="revenue"
+                name="Revenue"
+                stroke="url(#monthlyRevenueGradient)"
+                strokeWidth={3}
+                dot={{ fill: '#0F172A', stroke: '#ffffff', strokeWidth: 2, r: 5 }}
+              >
+                <LabelList dataKey="revenue" position="top" fill="#0f172a" style={{ fontSize: 12, fontWeight: 600 }} formatter={(value) => money(value)} />
+              </Line>
             </LineChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -435,6 +529,7 @@ function AdminPayments() {
       {refundPayment && (
         <ActionModal title="Refund Management" onClose={() => setRefundPayment(null)} onSubmit={runRefundAction}>
           <Select value={refundForm.decision} onChange={(value) => setRefundForm((prev) => ({ ...prev, decision: value }))} options={['approve', 'reject']} label="Decision" />
+          {refundForm.decision === 'approve' && <input className="input mt-3" type="number" min="0.01" step="0.01" max={Math.max(0, Number(refundPayment.amount || 0) - Number(refundPayment.refund_amount || 0))} placeholder="Refund amount (leave empty for full remaining amount)" value={refundForm.refund_amount} onChange={(e) => setRefundForm((prev) => ({ ...prev, refund_amount: e.target.value }))} />}
           <textarea className="input mt-3 min-h-24" placeholder="Refund reason" value={refundForm.reason} onChange={(e) => setRefundForm((prev) => ({ ...prev, reason: e.target.value }))} />
           <textarea className="input mt-3 min-h-24" placeholder="Admin notes" value={refundForm.notes} onChange={(e) => setRefundForm((prev) => ({ ...prev, notes: e.target.value }))} />
         </ActionModal>
@@ -458,8 +553,9 @@ function AdminPayments() {
 
 function RowActions({ payment, onView, onVerify, onRefund }) {
   const appointmentCompleted = String(payment.appointment_status || '').toLowerCase() === 'completed';
-  const canVerify = payment.payment_status === 'Completed' && appointmentCompleted && payment.service_status !== 'Refunded';
-  const canRefund = payment.payment_status === 'Completed' && payment.service_status !== 'Refunded';
+  const paid = ['Paid', 'Completed'].includes(payment.payment_status);
+  const canVerify = paid && appointmentCompleted && payment.service_status !== 'Refunded';
+  const canRefund = paid && payment.service_status !== 'Refunded';
   return (
     <div className="mt-3 flex flex-wrap gap-2 xl:mt-0">
       <button onClick={() => onView(payment)} className="btn-secondary"><FiEye /> Details</button>
@@ -491,10 +587,10 @@ function PaymentDetailsModal({ payment, onClose }) {
   return (
     <ActionModal title={`Payment #${payment.id}`} onClose={onClose} hideSubmit>
       <div className="grid gap-4 md:grid-cols-2">
-        <DetailGroup title="Patient Information" rows={[['Name', payment.user_name], ['Phone', payment.user_phone], ['Email', payment.user_email]]} />
+        <DetailGroup title="Patient Information" rows={[["Name", payment.user_name], ["Phone Number", payment.user_phone]]} />
         <DetailGroup title="Doctor Information" rows={[['Name', payment.doctor_name], ['Specialization', payment.doctor_specialization], ['Hospital', payment.doctor_hospital], ['Phone', payment.doctor_phone]]} />
         <DetailGroup title="Appointment Information" rows={[['Appointment ID', payment.appointment_id], ['Date', payment.appointment_date], ['Time', payment.appointment_time], ['Status', payment.appointment_status]]} />
-        <DetailGroup title="Payment Information" rows={[['Transaction ID', payment.transaction_id], ['Reference ID', payment.reference_id], ['Invoice ID', payment.invoice_id], ['Provider Transaction ID', payment.provider_transaction_id], ['Amount', `${money(payment.amount)} ${payment.currency || 'USD'}`], ['Method', payment.payment_method], ['Provider', payment.provider_name], ['Paid Date', dateTime(payment.paid_at)]]} />
+        <DetailGroup title="Payment Information" rows={[['Transaction ID', payment.transaction_id], ['Reference ID', payment.reference_id], ['Invoice ID', payment.invoice_id], ['Provider Transaction ID', payment.provider_transaction_id], ['Amount', `${money(payment.amount)} ${payment.currency || 'USD'}`], ['Method', payment.payment_method], ['Provider', payment.provider_name], ['Failure Reason', payment.failure_reason], ['Paid Date', dateTime(payment.paid_at)]]} />
       </div>
       <div className="mt-4 rounded-xl border border-gray-200 p-4 dark:border-slate-700">
         <h3 className="font-bold">Service Verification</h3>

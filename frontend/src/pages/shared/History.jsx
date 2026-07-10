@@ -69,7 +69,7 @@ ${payments.map(p => `Date: ${p.createdAt || p.date}\nDescription: ${p.descriptio
               placeholder="Search history"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full max-w-sm rounded-3xl border border-gray-200 bg-white/80 px-4 py-3 text-gray-900 outline-none shadow-sm backdrop-blur-sm"
+              className="w-full max-w-sm rounded-3xl border border-gray-200 bg-white/80 px-4 py-3 text-gray-900 outline-none shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-slate-950/80 dark:text-slate-100"
             />
             <button
               onClick={handleDownloadPDF}
@@ -79,18 +79,18 @@ ${payments.map(p => `Date: ${p.createdAt || p.date}\nDescription: ${p.descriptio
             </button>
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-2 rounded-3xl border border-gray-200 bg-white/80 px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 shadow-sm backdrop-blur-sm"
+              className="inline-flex items-center gap-2 rounded-3xl border border-gray-200 bg-white/80 px-5 py-3 text-sm font-semibold text-gray-700 shadow-sm backdrop-blur-sm transition hover:bg-gray-100 dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800"
             >
               <FiPrinter className="h-4 w-4" /> Print
             </button>
           </div>
         </div>
         <section className="space-y-6 rounded-[2rem] border border-white/20 bg-white/10 p-6 shadow-xl backdrop-blur-xl">
-          <h3 className="text-lg font-semibold text-gray-900">Prediction history</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Prediction history</h3>
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm text-gray-600">
+            <table className="min-w-full text-left text-sm text-gray-600 dark:text-slate-300">
               <thead>
-                <tr className="border-b border-gray-200 text-gray-500">
+                <tr className="border-b border-gray-200 text-gray-500 dark:border-white/10 dark:text-slate-400">
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Level</th>
                   <th className="px-4 py-3">Confidence</th>
@@ -99,7 +99,7 @@ ${payments.map(p => `Date: ${p.createdAt || p.date}\nDescription: ${p.descriptio
               </thead>
               <tbody>
                 {filterRecords(predictions).map((item) => (
-                  <tr key={item.id} className="border-b border-gray-200 hover:bg-slate-50">
+                  <tr key={item.id} className="border-b border-gray-200 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5">
                     <td className="px-4 py-4">{item.date}</td>
                     <td className="px-4 py-4">{item.anxietyLevel}</td>
                     <td className="px-4 py-4">{item.confidence}%</td>
@@ -113,7 +113,7 @@ ${payments.map(p => `Date: ${p.createdAt || p.date}\nDescription: ${p.descriptio
         
         {/* Anxiety Trends */}
         <section className="rounded-[2rem] border border-white/20 bg-white/10 p-6 shadow-xl backdrop-blur-xl">
-          <h3 className="text-lg font-semibold text-gray-900">Anxiety trends</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Anxiety trends</h3>
           <div className="mt-5 space-y-4">
             {predictions.length > 0 ? (
               <div className="space-y-3">
@@ -129,39 +129,39 @@ ${payments.map(p => `Date: ${p.createdAt || p.date}\nDescription: ${p.descriptio
                   
                   return (
                     <div key={prediction.id || index} className="flex items-center gap-4">
-                      <div className="w-24 text-xs text-gray-600">{prediction.date}</div>
-                      <div className="flex-1 h-6 rounded-full bg-gray-200 overflow-hidden">
+                      <div className="w-24 text-xs text-gray-600 dark:text-slate-300">{prediction.date}</div>
+                      <div className="flex-1 h-6 overflow-hidden rounded-full bg-gray-200 dark:bg-slate-950/70">
                         <div 
                           className={`h-full ${barColor} transition-all duration-300`}
                           style={{ width: `${barWidth}%` }}
                         />
                       </div>
-                      <div className="w-20 text-xs font-semibold text-gray-700">{prediction.anxietyLevel}</div>
-                      <div className="w-16 text-xs text-gray-500">{prediction.confidence}%</div>
+                      <div className="w-20 text-xs font-semibold text-gray-700 dark:text-slate-200">{prediction.anxietyLevel}</div>
+                      <div className="w-16 text-xs text-gray-500 dark:text-slate-400">{prediction.confidence}%</div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <p className="text-gray-600">No prediction data available for trends.</p>
+              <p className="text-gray-600 dark:text-slate-300">No prediction data available for trends.</p>
             )}
           </div>
         </section>
 
         {/* Recommendations */}
         <section className="rounded-[2rem] border border-white/20 bg-white/10 p-6 shadow-xl backdrop-blur-xl">
-          <h3 className="text-lg font-semibold text-gray-900">Recommendations</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Recommendations</h3>
           <div className="mt-5 space-y-4">
             {predictions.length > 0 ? (
               <div className="space-y-3">
                 {predictions.slice(0, 5).map((prediction, index) => (
-                  <div key={prediction.id || index} className="rounded-3xl bg-white/80 p-4 shadow-sm">
+                  <div key={prediction.id || index} className="rounded-3xl bg-white/80 p-4 shadow-sm dark:bg-slate-900/80">
                     <div className="flex items-center justify-between gap-4">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{prediction.anxietyLevel}</p>
-                        <p className="text-xs text-gray-500">{prediction.date}</p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">{prediction.anxietyLevel}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">{prediction.date}</p>
                       </div>
-                      <div className="text-xs text-gray-600">
+                      <div className="text-xs text-gray-600 dark:text-slate-300">
                         {prediction.summary}
                       </div>
                     </div>
@@ -178,25 +178,25 @@ ${payments.map(p => `Date: ${p.createdAt || p.date}\nDescription: ${p.descriptio
                 ))}
               </div>
             ) : (
-              <p className="text-gray-600">No recommendations available.</p>
+              <p className="text-gray-600 dark:text-slate-300">No recommendations available.</p>
             )}
           </div>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-2">
           <div className="rounded-[2rem] border border-white/20 bg-white/10 p-6 shadow-xl backdrop-blur-xl">
-            <h3 className="text-lg font-semibold text-gray-900">Booking history</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Booking history</h3>
             <div className="mt-5 overflow-x-auto">
             {appointmentsLoading ? (
-              <p className="text-gray-600">Loading appointment history...</p>
+              <p className="text-gray-600 dark:text-slate-300">Loading appointment history...</p>
             ) : appointmentsError ? (
               <p className="text-red-600">{appointmentsError}</p>
             ) : filterRecords(appointments).length === 0 ? (
-              <div className="rounded-3xl border border-gray-200 bg-white/80 p-8 text-gray-600 shadow-sm">No booking history found.</div>
+              <div className="rounded-3xl border border-gray-200 bg-white/80 p-8 text-gray-600 shadow-sm dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-300">No booking history found.</div>
             ) : (
-              <table className="min-w-full text-left text-sm text-gray-600">
+              <table className="min-w-full text-left text-sm text-gray-600 dark:text-slate-300">
                 <thead>
-                  <tr className="border-b border-gray-200 text-gray-500">
+                  <tr className="border-b border-gray-200 text-gray-500 dark:border-white/10 dark:text-slate-400">
                     <th className="px-4 py-3">Appointment Date</th>
                     <th className="px-4 py-3">Doctor</th>
                     <th className="px-4 py-3">Status</th>
@@ -206,7 +206,7 @@ ${payments.map(p => `Date: ${p.createdAt || p.date}\nDescription: ${p.descriptio
                 </thead>
                 <tbody>
                   {filterRecords(appointments).map((appointment) => (
-                    <tr key={appointment.id} className="border-b border-gray-200 hover:bg-slate-50">
+                    <tr key={appointment.id} className="border-b border-gray-200 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5">
                       <td className="px-4 py-4">{appointment.appointment_date}</td>
                       <td className="px-4 py-4">{appointment.doctor_name}</td>
                       <td className="px-4 py-4">{appointment.status}</td>
@@ -220,11 +220,11 @@ ${payments.map(p => `Date: ${p.createdAt || p.date}\nDescription: ${p.descriptio
           </div>
           </div>
           <div className="rounded-[2rem] border border-white/20 bg-white/10 p-6 shadow-xl backdrop-blur-xl">
-            <h3 className="text-lg font-semibold text-gray-900">Payment history</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Payment history</h3>
             <div className="mt-5 space-y-4">
               {filterRecords(payments).map((payment) => (
-                <div key={payment.id} className="rounded-3xl bg-white/80 p-4 text-gray-600 shadow-sm">
-                  <p className="font-semibold text-gray-900">{payment.description}</p>
+                <div key={payment.id} className="rounded-3xl bg-white/80 p-4 text-gray-600 shadow-sm dark:bg-slate-900/80 dark:text-slate-300">
+                  <p className="font-semibold text-gray-900 dark:text-slate-100">{payment.description}</p>
                   <p>{payment.createdAt || payment.date}</p>
                   <p className="mt-2 text-sm text-gray-500">Amount: {payment.amount} • {payment.status}</p>
                 </div>

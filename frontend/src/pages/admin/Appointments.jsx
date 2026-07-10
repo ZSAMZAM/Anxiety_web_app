@@ -7,6 +7,7 @@ function AdminAppointments() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [extensionReport, setExtensionReport] = useState({ stats: {}, doctors: [], history: [] });
   const [filters, setFilters] = useState({
     status: 'all',
     page: 1,
@@ -21,14 +22,20 @@ function AdminAppointments() {
   const loadAppointments = async () => {
     try {
       setLoading(true);
-      const data = await api.getAdminAppointments(filters);
+      const [data, extensions] = await Promise.all([
+        api.getAdminAppointments(filters),
+        api.getAdminConsultationExtensions(),
+      ]);
       setAppointments(data.appointments || []);
+      setExtensionReport(extensions || { stats: {}, doctors: [], history: [] });
     } catch (error) {
       console.error('Failed to load appointments:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  const extensionStats = extensionReport.stats || {};
 
   const handleStatusUpdate = async (appointmentId, newStatus) => {
     try {
@@ -57,7 +64,7 @@ function AdminAppointments() {
         const query = searchQuery.toLowerCase();
         return (
           (appointment.user_name && appointment.user_name.toLowerCase().includes(query)) ||
-          (appointment.user_email && appointment.user_email.toLowerCase().includes(query)) ||
+          (appointment.user_phone && appointment.user_phone.toLowerCase().includes(query)) ||
           (appointment.doctor_name && appointment.doctor_name.toLowerCase().includes(query))
         );
       }
@@ -67,11 +74,11 @@ function AdminAppointments() {
 
   const exportData = () => {
     const csvContent = [
-      ['ID', 'User Name', 'User Email', 'Doctor', 'Date', 'Time', 'Status'],
+      ['ID', 'User Name', 'Phone Number', 'Doctor', 'Date', 'Time', 'Status'],
       ...appointments.map(a => [
         a.id,
         a.user_name || '',
-        a.user_email || '',
+        a.user_phone || '',
         a.doctor_name,
         a.appointment_date,
         a.appointment_time,
@@ -225,6 +232,65 @@ function AdminAppointments() {
         </div>
       </div>
 
+      <div className="rounded-[2rem] border border-gray-200 bg-white/40 p-6 shadow-xl backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/40">
+        <div className="mb-5 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.35em] text-red-600 dark:text-red-300">Emergency extensions</p>
+            <h2 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-slate-100">Schedule protection and delay audit</h2>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-slate-400">Live from consultation extension logs</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            ['Emergency Extensions Today', extensionStats.emergency_extensions_today || 0],
+            ['Total Extended Consultations', extensionStats.total_extended_consultations || 0],
+            ['Average Extra Minutes', `${extensionStats.average_extra_minutes || 0} min`],
+            ['Total Extra Minutes', `${extensionStats.total_extra_minutes || 0} min`],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-slate-950/50">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+              <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-5 grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+          <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-slate-950/50">
+            <h3 className="font-bold text-slate-950 dark:text-white">Doctors Extending Most</h3>
+            <div className="mt-3 space-y-3">
+              {(extensionReport.doctors || []).length ? extensionReport.doctors.map((doctor) => (
+                <div key={doctor.doctor_id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-900">
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{doctor.doctor_name}</span>
+                  <span className="text-slate-500">{doctor.extension_count} extensions · {doctor.total_minutes} min</span>
+                </div>
+              )) : <p className="py-6 text-sm text-slate-500">No emergency extensions recorded yet.</p>}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-slate-950/50">
+            <h3 className="font-bold text-slate-950 dark:text-white">Extension History</h3>
+            <div className="mt-3 max-h-72 overflow-auto">
+              {(extensionReport.history || []).length ? (
+                <table className="min-w-full text-left text-xs">
+                  <thead className="text-slate-500">
+                    <tr><th className="py-2 pr-3">Doctor</th><th className="py-2 pr-3">Patient</th><th className="py-2 pr-3">Original</th><th className="py-2 pr-3">New</th><th className="py-2 pr-3">Added</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-white/10">
+                    {extensionReport.history.map((item) => (
+                      <tr key={item.id}>
+                        <td className="py-2 pr-3 font-semibold text-slate-900 dark:text-slate-100">{item.doctor_name}</td>
+                        <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">{item.patient_name}</td>
+                        <td className="py-2 pr-3 text-slate-500">{item.original_end_time}</td>
+                        <td className="py-2 pr-3 text-slate-500">{item.extended_end_time}</td>
+                        <td className="py-2 pr-3 font-bold text-red-600">+{item.added_minutes} min</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : <p className="py-6 text-sm text-slate-500">Delay reports will appear here after doctors extend consultations.</p>}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Appointments Table */}
       <div className="rounded-[2rem] border border-gray-200 bg-white/40 p-6 shadow-xl backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/40">
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -278,7 +344,7 @@ function AdminAppointments() {
                   <td className="px-4 py-4">
                     <div>
                       <p className="font-semibold text-gray-900 dark:text-slate-100">{appointment.user_name || 'Unknown'}</p>
-                      <p className="text-xs text-gray-500 dark:text-slate-500">{appointment.user_email}</p>
+                      <p className="text-xs text-gray-500 dark:text-slate-500">{appointment.user_phone || 'No phone number'}</p>
                     </div>
                   </td>
                   <td className="px-4 py-4">
@@ -290,6 +356,10 @@ function AdminAppointments() {
                         {appointment.appointment_date ? new Date(appointment.appointment_date).toLocaleDateString() : 'N/A'}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-slate-500">{appointment.appointment_time}</p>
+                      {appointment.appointment_end_time && <p className="text-xs text-gray-500 dark:text-slate-500">to {appointment.appointment_end_time}</p>}
+                      {appointment.extension_minutes > 0 && <span className={`mt-1 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${appointment.emergency_extension ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>{appointment.emergency_extension ? 'Emergency Consultation' : `Extended +${appointment.extension_minutes} min`}</span>}
+                      {appointment.extension_reason && <p className="mt-1 max-w-48 text-xs text-gray-500" title={appointment.extension_reason}>{appointment.extension_reason}</p>}
+                      {appointment.affected_appointments > 0 && <p className="mt-1 text-xs font-semibold text-blue-600">{appointment.affected_appointments} patient(s) rescheduled</p>}
                     </div>
                   </td>
                   <td className="px-4 py-4">

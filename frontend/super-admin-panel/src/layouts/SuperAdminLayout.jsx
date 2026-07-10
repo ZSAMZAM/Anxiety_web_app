@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import LanguageSelector from '../components/LanguageSelector';
 import { superAdminApi } from '../services/api';
 import {
   LayoutDashboard,
@@ -42,25 +44,26 @@ const SuperAdminLayout = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
+  const { t } = useLanguage();
 
   const menuItems = [
-    { path: '/super-admin/dashboard', icon: LayoutDashboard, label: 'IT Management Dashboard' },
-    { path: '/super-admin/admins', icon: UserCog, label: 'Administrators' },
-    { path: '/super-admin/users', icon: Users, label: 'Users' },
-    { path: '/super-admin/doctors', icon: Stethoscope, label: 'Doctors' },
-    { path: '/super-admin/payments', icon: CreditCard, label: 'Payments' },
-    { path: '/super-admin/service-verification', icon: ClipboardCheck, label: 'Service Verification' },
-    { path: '/super-admin/appointments', icon: Calendar, label: 'Appointments' },
-    { path: '/super-admin/predictions', icon: Brain, label: 'Predictions' },
-    { path: '/super-admin/reports', icon: FileText, label: 'Reports' },
-    { path: '/super-admin/audit-logs', icon: ScrollText, label: 'Audit Logs' },
-    { path: '/super-admin/roles', icon: ShieldCheck, label: 'Roles & Permissions' },
-    { path: '/super-admin/backups', icon: Database, label: 'Backup Management' },
-    { path: '/super-admin/system-monitoring', icon: Server, label: 'System Monitoring' },
-    { path: '/super-admin/system-settings', icon: Settings, label: 'System Settings' },
-    { path: '/super-admin/security', icon: Lock, label: 'Security Center' },
-    { path: '/super-admin/notifications', icon: Bell, label: 'Notifications' },
-    { path: '/super-admin/profile', icon: User, label: 'Profile' },
+    { path: '/super-admin/dashboard', icon: LayoutDashboard, labelKey: 'dashboard' },
+    { path: '/super-admin/admins', icon: UserCog, labelKey: 'administrators' },
+    { path: '/super-admin/users', icon: Users, labelKey: 'users' },
+    { path: '/super-admin/doctors', icon: Stethoscope, labelKey: 'doctors' },
+    { path: '/super-admin/payments', icon: CreditCard, labelKey: 'payments' },
+    { path: '/super-admin/service-verification', icon: ClipboardCheck, labelKey: 'serviceVerification' },
+    { path: '/super-admin/appointments', icon: Calendar, labelKey: 'appointments' },
+    { path: '/super-admin/predictions', icon: Brain, labelKey: 'predictions' },
+    { path: '/super-admin/reports', icon: FileText, labelKey: 'reports' },
+    { path: '/super-admin/audit-logs', icon: ScrollText, labelKey: 'auditLogs' },
+    { path: '/super-admin/roles', icon: ShieldCheck, labelKey: 'rolesPermissions' },
+    { path: '/super-admin/backups', icon: Database, labelKey: 'backupManagement' },
+    { path: '/super-admin/system-monitoring', icon: Server, labelKey: 'systemMonitoring' },
+    { path: '/super-admin/system-settings', icon: Settings, labelKey: 'systemSettings' },
+    { path: '/super-admin/security', icon: Lock, labelKey: 'securityCenter' },
+    { path: '/super-admin/notifications', icon: Bell, labelKey: 'notifications' },
+    { path: '/super-admin/profile', icon: User, labelKey: 'profile' },
   ];
 
   const handleLogout = async () => {
@@ -85,27 +88,27 @@ const SuperAdminLayout = () => {
   const unreadCount = notifications.filter((item) => String(item.status || 'Unread').toLowerCase() !== 'read').length;
 
   return (
-    <div className="min-h-screen dark:bg-slate-900 bg-slate-50 flex">
+    <div className="super-admin-shell min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-50 flex">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 dark:bg-slate-800 bg-white dark:border-r dark:border-slate-700 border-slate-200 transition-all duration-300 ${
+        className={`super-admin-sidebar fixed inset-y-0 left-0 z-50 border-r border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,142,168,0.10)] transition-all duration-300 dark:border-white/10 dark:bg-slate-800 dark:text-slate-50 dark:shadow-[18px_0_60px_rgba(2,8,23,0.32)] ${
           sidebarOpen ? 'w-64' : 'w-20'
         }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between p-4 dark:border-b dark:border-slate-700 border-b border-slate-200">
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-white/10">
             {sidebarOpen && (
               <div className="flex items-center space-x-2">
-                <div className="p-2 bg-primary/20 rounded-xl">
-                  <ShieldCheck className="w-6 h-6 text-primary" />
+                <div className="p-2 rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-glow">
+                  <ShieldCheck className="w-6 h-6" />
                 </div>
-                <span className="text-xl font-bold dark:text-slate-50 text-slate-900">IT Management Panel</span>
+                <span className="text-xl font-bold text-slate-900 dark:text-slate-50">{t('itManagementPanel')}</span>
               </div>
             )}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 rounded-xl dark:hover:bg-slate-700 hover:bg-slate-100 dark:text-slate-400 text-slate-600 dark:hover:text-slate-50 hover:text-slate-900 transition-all duration-300"
+              className="p-2 rounded-xl text-slate-600 transition-all duration-300 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-slate-50"
             >
               {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -122,8 +125,8 @@ const SuperAdminLayout = () => {
                   to={item.path}
                   className={`group flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 relative ${
                     isActive
-                      ? 'bg-primary text-white shadow-glow'
-                      : 'dark:text-slate-400 text-slate-600 dark:hover:bg-slate-700 hover:bg-slate-100 dark:hover:text-slate-50 hover:text-slate-900'
+                      ? 'bg-gradient-to-r from-primary/95 to-accent/90 text-white shadow-glow'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-white'
                   }`}
                 >
                   {isActive && (
@@ -131,7 +134,7 @@ const SuperAdminLayout = () => {
                   )}
                   <Icon className={`w-5 h-5 ${!sidebarOpen && 'mx-auto'} group-hover:scale-110 transition-transform duration-300`} />
                   {sidebarOpen && (
-                    <span className="font-medium">{item.label}</span>
+                    <span className="font-medium">{t(item.labelKey)}</span>
                   )}
                   {sidebarOpen && isActive && (
                     <ChevronRight className="w-4 h-4 ml-auto animate-fade-in" />
@@ -142,7 +145,7 @@ const SuperAdminLayout = () => {
           </nav>
 
           {/* Logout */}
-          <div className="p-4 dark:border-t dark:border-slate-700 border-t border-slate-200">
+          <div className="p-4 border-t border-slate-200 dark:border-white/10">
             <button
               onClick={handleLogout}
               className={`group flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-danger dark:hover:bg-danger/10 hover:bg-danger/10 transition-all duration-300 ${
@@ -150,7 +153,7 @@ const SuperAdminLayout = () => {
               }`}
             >
               <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
-              {sidebarOpen && <span className="font-medium">Logout</span>}
+              {sidebarOpen && <span className="font-medium">{t('logout')}</span>}
             </button>
           </div>
         </div>
@@ -163,11 +166,11 @@ const SuperAdminLayout = () => {
         }`}
       >
         {/* Topbar */}
-        <header className="dark:bg-slate-800 bg-white dark:border-b dark:border-slate-700 border-b border-slate-200 px-6 py-4 sticky top-0 z-40">
+        <header className="super-admin-topbar sticky top-0 z-40 border-b border-slate-200 bg-white px-6 py-4 shadow-[0_12px_30px_rgba(15,142,168,0.08)] dark:border-white/10 dark:bg-slate-800 dark:text-slate-50 dark:shadow-[0_18px_50px_rgba(2,8,23,0.24)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold dark:text-slate-50 text-slate-900">
-                {menuItems.find((item) => item.path === location.pathname)?.label || 'Dashboard'}
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">
+                {t(menuItems.find((item) => item.path === location.pathname)?.labelKey || 'dashboard')}
               </h1>
             </div>
 
@@ -176,7 +179,7 @@ const SuperAdminLayout = () => {
               <div className="relative">
                 <button
                   onClick={() => setSearchOpen(!searchOpen)}
-                  className="p-2 rounded-xl dark:hover:bg-slate-700 hover:bg-slate-100 dark:text-slate-400 text-slate-600 dark:hover:text-slate-50 hover:text-slate-900 transition-all duration-300"
+                  className="p-2 rounded-xl text-slate-600 transition-all duration-300 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-white"
                 >
                   <Search className="w-5 h-5" />
                 </button>
@@ -195,9 +198,11 @@ const SuperAdminLayout = () => {
               </div>
 
               {/* Theme Toggle */}
+              <LanguageSelector />
+
               <button
                 onClick={toggleTheme}
-                className="p-2 rounded-xl dark:hover:bg-slate-700 hover:bg-slate-100 dark:text-slate-400 text-slate-600 dark:hover:text-slate-50 hover:text-slate-900 transition-all duration-300"
+                className="p-2 rounded-xl text-slate-600 transition-all duration-300 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-white"
               >
                 {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
@@ -206,7 +211,7 @@ const SuperAdminLayout = () => {
               <div className="relative">
                 <button
                   onClick={() => setNotificationsOpen(!notificationsOpen)}
-                  className="p-2 rounded-xl dark:hover:bg-slate-700 hover:bg-slate-100 dark:text-slate-400 text-slate-600 dark:hover:text-slate-50 hover:text-slate-900 transition-all duration-300 relative"
+                  className="relative p-2 rounded-xl text-slate-600 transition-all duration-300 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-white"
                 >
                   <Bell className="w-5 h-5" />
                   {unreadCount > 0 && (
@@ -215,15 +220,15 @@ const SuperAdminLayout = () => {
                 </button>
                 {notificationsOpen && (
                   <div className="absolute right-0 top-12 w-80 premium-card p-4 animate-scale-in">
-                    <h3 className="font-bold dark:text-slate-50 text-slate-900 mb-4">Notifications</h3>
+                    <h3 className="font-bold dark:text-slate-50 text-slate-900 mb-4">{t('notifications')}</h3>
                     <div className="space-y-3">
                       {notifications.length === 0 && (
-                        <div className="p-3 dark:bg-slate-700 bg-slate-100 rounded-xl">
+                        <div className="p-3 rounded-xl bg-slate-100 dark:bg-white/8">
                           <p className="dark:text-slate-400 text-slate-600 text-sm">No real notifications yet</p>
                         </div>
                       )}
                       {notifications.map((notification) => (
-                        <div key={notification.id} className="p-3 dark:bg-slate-700 bg-slate-100 rounded-xl">
+                        <div key={notification.id} className="p-3 rounded-xl bg-slate-100 dark:bg-white/8">
                           <p className="font-medium dark:text-slate-50 text-slate-900 text-sm">{notification.title || notification.type || 'Notification'}</p>
                           <p className="dark:text-slate-400 text-slate-600 text-xs mt-1">{notification.message}</p>
                           <p className="dark:text-slate-400 text-slate-600 text-xs mt-2">
@@ -240,13 +245,13 @@ const SuperAdminLayout = () => {
               <div className="relative">
                 <button
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="flex items-center space-x-3 px-4 py-2 rounded-xl dark:hover:bg-slate-700 hover:bg-slate-100 transition-all duration-300"
+                  className="flex items-center space-x-3 px-4 py-2 rounded-xl transition-all duration-300 hover:bg-slate-100 dark:hover:bg-slate-700"
                 >
                   <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
                     <User className="w-5 h-5 text-primary" />
                   </div>
-                  <span className="dark:text-slate-50 text-slate-900 font-medium">{user?.username}</span>
-                  <ChevronDown className={`w-4 h-4 dark:text-slate-400 text-slate-600 transition-transform duration-300 ${profileDropdownOpen ? 'rotate-180' : ''}`} />
+                  <span className="text-slate-900 font-medium dark:text-slate-50">{user?.username}</span>
+                  <ChevronDown className={`w-4 h-4 text-slate-600 transition-transform duration-300 dark:text-slate-300 ${profileDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {profileDropdownOpen && (
@@ -277,7 +282,7 @@ const SuperAdminLayout = () => {
         </header>
 
         {/* Page Content */}
-        <main className="super-admin-surface p-6">
+        <main className="super-admin-surface min-h-[calc(100vh-73px)] bg-[radial-gradient(circle_at_top_right,rgba(20,184,166,0.10),transparent_28%),linear-gradient(180deg,#F7FAFC_0%,#EEF8FB_100%)] p-6 dark:bg-[radial-gradient(circle_at_top_right,rgba(14,165,233,0.22),transparent_30%),radial-gradient(circle_at_10%_0%,rgba(34,211,238,0.12),transparent_26%),linear-gradient(180deg,#0F172A_0%,#111C31_100%)]">
           <Outlet />
         </main>
       </div>
