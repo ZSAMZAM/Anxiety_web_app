@@ -7,12 +7,18 @@ from flask import Blueprint, request, jsonify, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
 import jwt
 from datetime import datetime, timedelta, timezone
+import logging
 import os
 import platform as platform_module
 import shutil
 import time
-import traceback
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
+
+
+def log_info(*args, **_kwargs):
+    logger.info(" ".join(str(arg) for arg in args))
 
 # Create Blueprint
 super_admin_bp = Blueprint('super_admin', __name__)
@@ -32,7 +38,7 @@ def init_super_admin(mysql_instance, config):
     global mysql, app_config, JWT_SECRET, JWT_ALGORITHM, SUPER_ADMIN_MYSQL_DB, SUPER_ADMIN_TABLE
     mysql = mysql_instance
     app_config = config
-    JWT_SECRET = config.get('JWT_SECRET', 'mindcare-secret-key')
+    JWT_SECRET = config.get('JWT_SECRET')
     JWT_ALGORITHM = config.get('JWT_ALGORITHM', 'HS256')
     SUPER_ADMIN_MYSQL_DB = config.get('SUPER_ADMIN_MYSQL_DB', 'super_admins')
     SUPER_ADMIN_TABLE = config.get('SUPER_ADMIN_TABLE', 'super_admins')
@@ -63,25 +69,11 @@ def main_database_name():
 
 
 def backup_directory():
-    path = app_config.get('BACKUP_DIR') if app_config else None
-    if not path:
-        path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backups')
-    os.makedirs(path, exist_ok=True)
-    return path
+    return None
 
 
 def ensure_backup_columns(cur):
-    for column, definition in [
-        ('backup_path', 'VARCHAR(500) DEFAULT NULL'),
-        ('database_names', 'VARCHAR(255) DEFAULT NULL'),
-    ]:
-        cur.execute(
-            "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'backups' AND COLUMN_NAME = %s",
-            (main_database_name(), column),
-        )
-        if cur.fetchone()[0] == 0:
-            cur.execute(f"ALTER TABLE backups ADD COLUMN {column} {definition}")
-            mysql.connection.commit()
+    return None
 
 
 def sql_literal(value):
@@ -98,42 +90,7 @@ def sql_literal(value):
 
 
 def write_database_dump(file_path, databases):
-    cur = mysql.connection.cursor()
-    with open(file_path, 'w', encoding='utf-8') as backup_file:
-        backup_file.write("-- AnxietyCare database backup\n")
-        backup_file.write(f"-- Created at {utc_now_naive().strftime('%Y-%m-%d %H:%M:%S')} UTC\n")
-        backup_file.write("SET FOREIGN_KEY_CHECKS=0;\n\n")
-
-        for database in databases:
-            backup_file.write(f"CREATE DATABASE IF NOT EXISTS {quote_mysql_identifier(database)};\n")
-            backup_file.write(f"USE {quote_mysql_identifier(database)};\n\n")
-
-            cur.execute(
-                "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME",
-                (database,),
-            )
-            tables = [row[0] for row in cur.fetchall()]
-
-            for table in tables:
-                qualified = qualified_table(database, table)
-                backup_file.write(f"DROP TABLE IF EXISTS {quote_mysql_identifier(table)};\n")
-                cur.execute(f"SHOW CREATE TABLE {qualified}")
-                create_sql = cur.fetchone()[1]
-                backup_file.write(f"{create_sql};\n\n")
-
-                cur.execute(f"SELECT * FROM {qualified}")
-                rows = cur.fetchall()
-                if not rows:
-                    continue
-                columns = [quote_mysql_identifier(col[0]) for col in cur.description]
-                column_sql = ', '.join(columns)
-                for row in rows:
-                    values = ', '.join(sql_literal(value) for value in row)
-                    backup_file.write(f"INSERT INTO {quote_mysql_identifier(table)} ({column_sql}) VALUES ({values});\n")
-                backup_file.write("\n")
-
-        backup_file.write("SET FOREIGN_KEY_CHECKS=1;\n")
-    cur.close()
+    raise RuntimeError("Backend SQL backup generation is disabled. Use phpMyAdmin/MySQL backup tooling.")
 
 
 def fetch_notification_recipients(cur, target, explicit_user_ids=None):
@@ -159,11 +116,57 @@ def fetch_notification_recipients(cur, target, explicit_user_ids=None):
     else:
         filters.append("LOWER(role) IN ('user', 'patient', 'doctor', 'admin')")
 
-    if filters:
-        query += " WHERE " + " AND ".join(filters)
+    filters.append("COALESCE(sandbox_mode, 0) = 0")
+    query += " WHERE " + " AND ".join(filters)
 
     cur.execute(query, params)
     return cur.fetchall()
+
+
+def normalize_notification_type(notification_type):
+    raw = str(notification_type or 'SYSTEM').strip().upper()
+    if raw in ['ASSESSMENT', 'APPOINTMENT', 'PAYMENT', 'DOCTOR_APPROVED', 'SYSTEM', 'SECURITY']:
+        return raw
+    return 'SYSTEM'
+
+
+def create_doctor_approved_notifications(cur, doctor_id):
+    cur.execute(
+        """
+        SELECT name, specialization, specialty, experience, experience_years, consultation_fee
+        FROM doctors
+        WHERE id = %s
+        """,
+        (doctor_id,)
+    )
+    doctor = cur.fetchone()
+    if not doctor:
+        return 0
+
+    name, specialization, specialty, experience, experience_years, consultation_fee = doctor
+    doctor_name = name or f"Doctor {doctor_id}"
+    doctor_specialization = specialization or specialty or 'Mental Health Specialist'
+    doctor_experience = experience_years if experience_years is not None else experience
+    fee = consultation_fee if consultation_fee is not None else 0
+    title = 'New mental health specialist is now available'
+    message = (
+        f"Dr. {doctor_name} ({doctor_specialization}) is now available for booking. "
+        f"Experience: {doctor_experience or 'Not listed'}. Consultation Fee: ${float(fee):.2f}."
+    )
+
+    recipients = fetch_notification_recipients(cur, 'patients')
+    sent_count = 0
+    for user_id, recipient, _role in recipients:
+        cur.execute(
+            """
+            INSERT INTO notifications
+              (user_id, role_target, title, message, type, reference_id, is_read, notification_type, recipient, recipient_type, status, created_at)
+            VALUES (%s, 'user', %s, %s, 'DOCTOR_APPROVED', %s, 0, 'doctor_approved', %s, 'user', 'Unread', %s)
+            """,
+            (user_id, title, message, doctor_id, recipient, utc_now_naive())
+        )
+        sent_count += 1
+    return sent_count
 
 
 def verify_stored_password(stored_password, candidate_password):
@@ -253,24 +256,20 @@ def create_audit_log(actor, role, action, description, ip_address=None):
         mysql.connection.commit()
         cur.close()
     except Exception as e:
-        print(f"Failed to create audit log: {e}")
+        log_info(f"Failed to create audit log: {e}")
 
 
 def ensure_security_log_columns(cur):
-    columns = {
-        'username': 'VARCHAR(255) DEFAULT NULL',
-        'role': 'VARCHAR(50) DEFAULT NULL',
-        'browser': 'VARCHAR(255) DEFAULT NULL',
-        'device': 'VARCHAR(255) DEFAULT NULL',
-        'platform': 'VARCHAR(100) DEFAULT NULL',
-        'status': 'VARCHAR(50) DEFAULT NULL',
-    }
-    for column, definition in columns.items():
-        try:
-            cur.execute(f"ALTER TABLE security_logs ADD COLUMN {column} {definition}")
-            mysql.connection.commit()
-        except Exception:
-            mysql.connection.rollback()
+    return None
+
+
+def _schema_managed_externally(*_args, **_kwargs):
+    """Schema is managed in MySQL/phpMyAdmin, not by Flask routes."""
+    return None
+
+
+ensure_backup_columns = _schema_managed_externally
+ensure_security_log_columns = _schema_managed_externally
 
 
 def parse_user_agent():
@@ -311,7 +310,7 @@ def create_security_log(username, role, status, description, action='LOGIN_ATTEM
         mysql.connection.commit()
         cur.close()
     except Exception as e:
-        print(f"Failed to create security log: {e}")
+        log_info(f"Failed to create security log: {e}")
         try:
             cur.close()
         except Exception:
@@ -383,8 +382,8 @@ def super_admin_login():
         }), 200
         
     except Exception as e:
-        print(f"IT Management Login Error: {e}")
-        traceback.print_exc()
+        log_info(f"IT Management Login Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Login failed.'}), 500
 
 
@@ -424,20 +423,32 @@ def get_dashboard():
         total_admins = cur.fetchone()[0]
         
         # Total Appointments
-        cur.execute("SELECT COUNT(*) FROM appointments")
+        cur.execute("SELECT COUNT(*) FROM appointments WHERE COALESCE(sandbox_mode, 0) = 0")
         total_appointments = cur.fetchone()[0]
         
         # Total Predictions
-        cur.execute("SELECT COUNT(*) FROM predictions")
+        cur.execute("SELECT COUNT(*) FROM predictions WHERE COALESCE(sandbox_mode, 0) = 0")
         total_predictions = cur.fetchone()[0]
         
         # Total Revenue
-        cur.execute("SELECT SUM(amount) FROM payments WHERE payment_status = 'Completed'")
+        cur.execute("SELECT SUM(COALESCE(net_amount, amount - COALESCE(refunded_amount, 0), amount)) FROM payments WHERE payment_status = 'Completed' AND COALESCE(sandbox_mode, 0) = 0")
         total_revenue = cur.fetchone()[0] or 0
         
         # Pending Payments
-        cur.execute("SELECT COUNT(*) FROM payments WHERE payment_status = 'Pending'")
+        cur.execute("SELECT COUNT(*) FROM payments WHERE payment_status = 'Pending' AND COALESCE(sandbox_mode, 0) = 0")
         pending_payments = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM predictions WHERE DATE(created_at) = CURDATE() AND COALESCE(sandbox_mode, 0) = 0")
+        new_assessments_today = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM appointments WHERE DATE(created_at) = CURDATE() AND COALESCE(sandbox_mode, 0) = 0")
+        new_appointments_today = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM payments WHERE payment_status = 'Completed' AND COALESCE(sandbox_mode, 0) = 0 AND DATE(COALESCE(paid_at, created_at)) = CURDATE()")
+        new_payments_today = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM doctors WHERE UPPER(status) = 'ACTIVE' AND DATE(created_at) = CURDATE()")
+        new_doctors_today = cur.fetchone()[0]
 
         cur.execute("""
             SELECT COUNT(*) FROM security_logs
@@ -462,14 +473,18 @@ def get_dashboard():
             'total_predictions': total_predictions,
             'total_revenue': float(total_revenue),
             'pending_payments': pending_payments,
+            'new_assessments_today': new_assessments_today,
+            'new_appointments_today': new_appointments_today,
+            'new_payments_today': new_payments_today,
+            'new_doctors_today': new_doctors_today,
             'failed_logins_today': failed_logins_today,
             'blocked_access_attempts': blocked_access_attempts,
             'system_health': 'healthy'
         }), 200
         
     except Exception as e:
-        print(f"Dashboard Error: {e}")
-        traceback.print_exc()
+        log_info(f"Dashboard Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load dashboard stats'}), 500
 
 
@@ -531,8 +546,8 @@ def get_admins():
         }), 200
         
     except Exception as e:
-        print(f"Get Admins Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Admins Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load admins'}), 500
 
 
@@ -592,8 +607,8 @@ def create_admin():
         return jsonify({'message': 'Admin created successfully', 'user_id': user_id}), 201
         
     except Exception as e:
-        print(f"Create Admin Error: {e}")
-        traceback.print_exc()
+        log_info(f"Create Admin Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to create admin'}), 500
 
 
@@ -655,8 +670,8 @@ def update_admin(admin_id):
         return jsonify({'message': 'Admin updated successfully'}), 200
         
     except Exception as e:
-        print(f"Update Admin Error: {e}")
-        traceback.print_exc()
+        log_info(f"Update Admin Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to update admin'}), 500
 
 
@@ -695,8 +710,8 @@ def delete_admin(admin_id):
         return jsonify({'message': 'Admin deleted successfully'}), 200
         
     except Exception as e:
-        print(f"Delete Admin Error: {e}")
-        traceback.print_exc()
+        log_info(f"Delete Admin Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to delete admin'}), 500
 
 
@@ -731,8 +746,8 @@ def suspend_admin(admin_id):
         return jsonify({'message': 'Admin suspended successfully'}), 200
         
     except Exception as e:
-        print(f"Suspend Admin Error: {e}")
-        traceback.print_exc()
+        log_info(f"Suspend Admin Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to suspend admin'}), 500
 
 
@@ -767,8 +782,8 @@ def activate_admin(admin_id):
         return jsonify({'message': 'Admin activated successfully'}), 200
         
     except Exception as e:
-        print(f"Activate Admin Error: {e}")
-        traceback.print_exc()
+        log_info(f"Activate Admin Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to activate admin'}), 500
 
 
@@ -827,8 +842,8 @@ def get_users():
         }), 200
         
     except Exception as e:
-        print(f"Get Users Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Users Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load users'}), 500
 
 
@@ -860,8 +875,8 @@ def delete_user(user_id):
         return jsonify({'message': 'User deleted successfully'}), 200
         
     except Exception as e:
-        print(f"Delete User Error: {e}")
-        traceback.print_exc()
+        log_info(f"Delete User Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to delete user'}), 500
 
 
@@ -899,8 +914,8 @@ def update_user_status(user_id):
         return jsonify({'message': 'User status updated successfully'}), 200
         
     except Exception as e:
-        print(f"Update User Status Error: {e}")
-        traceback.print_exc()
+        log_info(f"Update User Status Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to update user status'}), 500
 
 
@@ -964,8 +979,8 @@ def get_doctors():
         }), 200
         
     except Exception as e:
-        print(f"Get Doctors Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Doctors Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load doctors'}), 500
 
 
@@ -988,6 +1003,10 @@ def delete_doctor(doctor_id):
         
         user_id = doctor[0]
         
+        # Preserve historical appointments/payments while preventing broken doctor references.
+        cur.execute("UPDATE appointments SET doctor_id = NULL WHERE doctor_id = %s", (doctor_id,))
+        cur.execute("UPDATE payments SET doctor_id = NULL WHERE doctor_id = %s", (doctor_id,))
+
         # Delete doctor record
         cur.execute("DELETE FROM doctors WHERE id = %s", (doctor_id,))
         
@@ -1005,8 +1024,8 @@ def delete_doctor(doctor_id):
         return jsonify({'message': 'Doctor deleted successfully'}), 200
         
     except Exception as e:
-        print(f"Delete Doctor Error: {e}")
-        traceback.print_exc()
+        log_info(f"Delete Doctor Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to delete doctor'}), 500
 
 
@@ -1046,8 +1065,8 @@ def suspend_doctor(doctor_id):
         return jsonify({'message': 'Doctor suspended successfully'}), 200
         
     except Exception as e:
-        print(f"Suspend Doctor Error: {e}")
-        traceback.print_exc()
+        log_info(f"Suspend Doctor Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to suspend doctor'}), 500
 
 
@@ -1076,6 +1095,8 @@ def activate_doctor(doctor_id):
         # Activate user if exists
         if user_id:
             cur.execute("UPDATE users SET status = 'active' WHERE id = %s", (user_id,))
+
+        notified_patients = create_doctor_approved_notifications(cur, doctor_id)
         
         mysql.connection.commit()
         cur.close()
@@ -1084,11 +1105,11 @@ def activate_doctor(doctor_id):
         current_admin = get_current_super_admin()
         create_audit_log(current_admin.get('username'), 'SUPER_ADMIN', 'ACTIVATE_DOCTOR', f'Activated doctor ID: {doctor_id}', request.remote_addr)
         
-        return jsonify({'message': 'Doctor activated successfully'}), 200
+        return jsonify({'message': 'Doctor activated successfully', 'notified_patients': notified_patients}), 200
         
     except Exception as e:
-        print(f"Activate Doctor Error: {e}")
-        traceback.print_exc()
+        log_info(f"Activate Doctor Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to activate doctor'}), 500
 
 
@@ -1117,6 +1138,8 @@ def approve_doctor(doctor_id):
         # Activate user if exists
         if user_id:
             cur.execute("UPDATE users SET status = 'active' WHERE id = %s", (user_id,))
+
+        notified_patients = create_doctor_approved_notifications(cur, doctor_id)
         
         mysql.connection.commit()
         cur.close()
@@ -1125,11 +1148,11 @@ def approve_doctor(doctor_id):
         current_admin = get_current_super_admin()
         create_audit_log(current_admin.get('username'), 'SUPER_ADMIN', 'APPROVE_DOCTOR', f'Approved doctor ID: {doctor_id}', request.remote_addr)
         
-        return jsonify({'message': 'Doctor approved successfully'}), 200
+        return jsonify({'message': 'Doctor approved successfully', 'notified_patients': notified_patients}), 200
         
     except Exception as e:
-        print(f"Approve Doctor Error: {e}")
-        traceback.print_exc()
+        log_info(f"Approve Doctor Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to approve doctor'}), 500
 
 
@@ -1152,7 +1175,7 @@ def get_payments():
         cur = mysql.connection.cursor()
         
         # Get total count
-        cur.execute("SELECT COUNT(*) FROM payments")
+        cur.execute("SELECT COUNT(*) FROM payments WHERE COALESCE(sandbox_mode, 0) = 0")
         total = cur.fetchone()[0]
         
         # Get payments with user and doctor details
@@ -1165,6 +1188,7 @@ def get_payments():
             LEFT JOIN users u ON p.user_id = u.id
             LEFT JOIN appointments a ON p.reference_id = a.id
             LEFT JOIN doctors d ON a.doctor_id = d.id
+            WHERE COALESCE(p.sandbox_mode, 0) = 0
             ORDER BY p.created_at DESC
             LIMIT %s OFFSET %s
         """, (limit, offset))
@@ -1195,8 +1219,8 @@ def get_payments():
         }), 200
         
     except Exception as e:
-        print(f"Get Payments Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Payments Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load payments'}), 500
 
 
@@ -1212,16 +1236,18 @@ def get_payment_stats():
         
         # Today's revenue
         cur.execute("""
-            SELECT SUM(amount) FROM payments 
-            WHERE payment_status = 'Completed' 
+            SELECT SUM(COALESCE(net_amount, amount - COALESCE(refunded_amount, 0), amount)) FROM payments 
+            WHERE payment_status = 'Completed'
+            AND COALESCE(sandbox_mode, 0) = 0
             AND DATE(created_at) = CURDATE()
         """)
         today_revenue = cur.fetchone()[0] or 0
         
         # Monthly revenue
         cur.execute("""
-            SELECT SUM(amount) FROM payments 
-            WHERE payment_status = 'Completed' 
+            SELECT SUM(COALESCE(net_amount, amount - COALESCE(refunded_amount, 0), amount)) FROM payments 
+            WHERE payment_status = 'Completed'
+            AND COALESCE(sandbox_mode, 0) = 0
             AND YEAR(created_at) = YEAR(CURDATE())
             AND MONTH(created_at) = MONTH(CURDATE())
         """)
@@ -1229,8 +1255,9 @@ def get_payment_stats():
         
         # Total revenue
         cur.execute("""
-            SELECT SUM(amount) FROM payments 
+            SELECT SUM(COALESCE(net_amount, amount - COALESCE(refunded_amount, 0), amount)) FROM payments 
             WHERE payment_status = 'Completed'
+            AND COALESCE(sandbox_mode, 0) = 0
         """)
         total_revenue = cur.fetchone()[0] or 0
         
@@ -1238,6 +1265,7 @@ def get_payment_stats():
         cur.execute("""
             SELECT COUNT(*) FROM payments 
             WHERE payment_status = 'Failed'
+            AND COALESCE(sandbox_mode, 0) = 0
         """)
         failed_transactions = cur.fetchone()[0]
         
@@ -1251,8 +1279,8 @@ def get_payment_stats():
         }), 200
         
     except Exception as e:
-        print(f"Get Payment Stats Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Payment Stats Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load payment stats'}), 500
 
 
@@ -1275,7 +1303,7 @@ def get_appointments():
         cur = mysql.connection.cursor()
         
         # Get total count
-        cur.execute("SELECT COUNT(*) FROM appointments")
+        cur.execute("SELECT COUNT(*) FROM appointments WHERE COALESCE(sandbox_mode, 0) = 0")
         total = cur.fetchone()[0]
         
         # Get appointments with user and doctor details
@@ -1287,6 +1315,7 @@ def get_appointments():
             FROM appointments a
             LEFT JOIN users u ON a.user_id = u.id
             LEFT JOIN doctors d ON a.doctor_id = d.id
+            WHERE COALESCE(a.sandbox_mode, 0) = 0
             ORDER BY a.created_at DESC
             LIMIT %s OFFSET %s
         """, (limit, offset))
@@ -1316,8 +1345,8 @@ def get_appointments():
         }), 200
         
     except Exception as e:
-        print(f"Get Appointments Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Appointments Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load appointments'}), 500
 
 
@@ -1340,7 +1369,7 @@ def get_predictions():
         cur = mysql.connection.cursor()
         
         # Get total count
-        cur.execute("SELECT COUNT(*) FROM predictions")
+        cur.execute("SELECT COUNT(*) FROM predictions WHERE COALESCE(sandbox_mode, 0) = 0")
         total = cur.fetchone()[0]
         
         # Get predictions with user details
@@ -1349,6 +1378,7 @@ def get_predictions():
                    u.username, u.fullname
             FROM predictions p
             LEFT JOIN users u ON p.user_id = u.id
+            WHERE COALESCE(p.sandbox_mode, 0) = 0
             ORDER BY p.created_at DESC
             LIMIT %s OFFSET %s
         """, (limit, offset))
@@ -1376,8 +1406,8 @@ def get_predictions():
         }), 200
         
     except Exception as e:
-        print(f"Get Predictions Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Predictions Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load predictions'}), 500
 
 
@@ -1400,7 +1430,7 @@ def get_reports():
         cur = mysql.connection.cursor()
         
         # Get total count
-        cur.execute("SELECT COUNT(*) FROM reports")
+        cur.execute("SELECT COUNT(*) FROM reports WHERE COALESCE(sandbox_mode, 0) = 0")
         total = cur.fetchone()[0]
         
         # Get reports
@@ -1408,6 +1438,7 @@ def get_reports():
             SELECT id, report_id, user_id, user_name, doctor_name, prediction_type, 
                    prediction_result, status, created_at
             FROM reports
+            WHERE COALESCE(sandbox_mode, 0) = 0
             ORDER BY created_at DESC
             LIMIT %s OFFSET %s
         """, (limit, offset))
@@ -1438,8 +1469,8 @@ def get_reports():
         }), 200
         
     except Exception as e:
-        print(f"Get Reports Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Reports Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load reports'}), 500
 
 
@@ -1475,8 +1506,8 @@ def generate_report():
         return jsonify({'message': 'Report generated successfully', 'report_id': report_uuid}), 201
         
     except Exception as e:
-        print(f"Generate Report Error: {e}")
-        traceback.print_exc()
+        log_info(f"Generate Report Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to generate report'}), 500
 
 
@@ -1534,8 +1565,8 @@ def get_audit_logs():
         }), 200
         
     except Exception as e:
-        print(f"Get Audit Logs Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Audit Logs Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load audit logs'}), 500
 
 
@@ -1591,8 +1622,8 @@ def get_roles():
         return jsonify({'roles': roles}), 200
         
     except Exception as e:
-        print(f"Get Roles Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Roles Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load roles'}), 500
 
 
@@ -1632,8 +1663,8 @@ def update_role_permissions(role_id):
         return jsonify({'message': 'Role permissions updated successfully'}), 200
         
     except Exception as e:
-        print(f"Update Role Permissions Error: {e}")
-        traceback.print_exc()
+        log_info(f"Update Role Permissions Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to update role permissions'}), 500
 
 
@@ -1679,8 +1710,8 @@ def get_system_settings():
         return jsonify({'settings': settings}), 200
         
     except Exception as e:
-        print(f"Get System Settings Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get System Settings Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load system settings'}), 500
 
 
@@ -1717,8 +1748,8 @@ def update_system_settings():
         return jsonify({'message': 'System settings updated successfully'}), 200
         
     except Exception as e:
-        print(f"Update System Settings Error: {e}")
-        traceback.print_exc()
+        log_info(f"Update System Settings Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to update system settings'}), 500
 
 
@@ -1762,8 +1793,8 @@ def get_backups():
         return jsonify({'backups': backups}), 200
         
     except Exception as e:
-        print(f"Get Backups Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Backups Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load backups'}), 500
 
 
@@ -1771,48 +1802,7 @@ def get_backups():
 @super_admin_required
 def create_backup():
     """Create a database backup"""
-    if not mysql:
-        return jsonify({'error': 'Database unavailable'}), 500
-    
-    try:
-        backup_name = f"backup_{utc_now_naive().strftime('%Y%m%d_%H%M%S')}.sql"
-        backup_path = os.path.join(backup_directory(), backup_name)
-        databases = []
-        for database in [main_database_name(), SUPER_ADMIN_MYSQL_DB]:
-            if database and database not in databases:
-                databases.append(database)
-
-        write_database_dump(backup_path, databases)
-        backup_size_bytes = os.path.getsize(backup_path)
-        backup_size = f"{backup_size_bytes} bytes"
-        
-        cur = mysql.connection.cursor()
-        ensure_backup_columns(cur)
-        
-        # Create backup record
-        cur.execute("""
-            INSERT INTO backups (backup_name, backup_size, backup_path, database_names, created_at)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (backup_name, backup_size, backup_path, ','.join(databases), utc_now_naive()))
-        
-        mysql.connection.commit()
-        cur.close()
-        
-        # Create audit log
-        current_admin = get_current_super_admin()
-        create_audit_log(current_admin.get('username'), 'SUPER_ADMIN', 'CREATE_BACKUP', f'Created backup: {backup_name}', request.remote_addr)
-        
-        return jsonify({
-            'message': 'Backup created successfully',
-            'backup_name': backup_name,
-            'backup_size': backup_size,
-            'databases': databases,
-        }), 201
-        
-    except Exception as e:
-        print(f"Create Backup Error: {e}")
-        traceback.print_exc()
-        return jsonify({'error': 'Failed to create backup'}), 500
+    return jsonify({'error': 'Backend SQL backup generation is disabled. Use phpMyAdmin/MySQL backup tooling.'}), 410
 
 
 @super_admin_bp.route('/backups/<int:backup_id>', methods=['DELETE'])
@@ -1849,8 +1839,8 @@ def delete_backup(backup_id):
         return jsonify({'message': 'Backup deleted successfully'}), 200
         
     except Exception as e:
-        print(f"Delete Backup Error: {e}")
-        traceback.print_exc()
+        log_info(f"Delete Backup Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to delete backup'}), 500
 
 
@@ -1885,8 +1875,8 @@ def download_backup(backup_id):
             mimetype='application/sql',
         )
     except Exception as e:
-        print(f"Download Backup Error: {e}")
-        traceback.print_exc()
+        log_info(f"Download Backup Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to download backup'}), 500
 
 
@@ -2021,8 +2011,8 @@ def get_security_stats():
         }), 200
         
     except Exception as e:
-        print(f"Get Security Stats Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Security Stats Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load security stats'}), 500
 
 
@@ -2142,8 +2132,8 @@ def get_service_verification_monitoring():
             }
         }), 200
     except Exception as e:
-        print(f"Service Verification Error: {e}")
-        traceback.print_exc()
+        log_info(f"Service Verification Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load service verification monitoring'}), 500
 
 
@@ -2163,22 +2153,28 @@ def get_notifications():
         
         # Get notifications
         cur.execute("""
-            SELECT id, title, message, recipient, recipient_type, status, created_at
+            SELECT id, user_id, role_target, title, message, COALESCE(type, notification_type), reference_id, recipient, recipient_type, status, is_read, created_at
             FROM notifications
+            WHERE COALESCE(sandbox_mode, 0) = 0
             ORDER BY created_at DESC
             LIMIT 50
         """)
         
         notifications = []
         for row in cur.fetchall():
-            notif_id, title, message, recipient, recipient_type, status, created_at = row
+            notif_id, user_id, role_target, title, message, notification_type, reference_id, recipient, recipient_type, status, is_read, created_at = row
             notifications.append({
                 'id': notif_id,
+                'user_id': user_id,
+                'role_target': role_target,
                 'title': title,
                 'message': message,
+                'type': notification_type,
+                'reference_id': reference_id,
                 'recipient': recipient,
                 'recipient_type': recipient_type,
                 'status': status or 'Unread',
+                'is_read': bool(is_read) or str(status or '').lower() == 'read',
                 'created_at': created_at.strftime('%Y-%m-%d %H:%M:%S') if created_at else None
             })
         
@@ -2187,8 +2183,8 @@ def get_notifications():
         return jsonify({'notifications': notifications}), 200
         
     except Exception as e:
-        print(f"Get Notifications Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Notifications Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load notifications'}), 500
 
 
@@ -2220,11 +2216,12 @@ def send_notification():
         sent_count = 0
         recipient_type = target.lower()
         for user_id, recipient, role in recipients:
+            normalized_type = normalize_notification_type(notification_type)
             cur.execute("""
                 INSERT INTO notifications
-                  (user_id, title, message, recipient, notification_type, recipient_type, status, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, 'Unread', %s)
-            """, (user_id, title, message, recipient, notification_type, recipient_type, utc_now_naive()))
+                  (user_id, role_target, title, message, type, reference_id, is_read, recipient, notification_type, recipient_type, status, created_at)
+                VALUES (%s, %s, %s, %s, %s, NULL, 0, %s, %s, %s, 'Unread', %s)
+            """, (user_id, recipient_type, title, message, normalized_type, recipient, normalized_type.lower(), recipient_type, utc_now_naive()))
             sent_count += 1
         
         mysql.connection.commit()
@@ -2241,8 +2238,8 @@ def send_notification():
         }), 201
         
     except Exception as e:
-        print(f"Send Notification Error: {e}")
-        traceback.print_exc()
+        log_info(f"Send Notification Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to send notification'}), 500
 
 
@@ -2290,8 +2287,8 @@ def get_profile():
         }), 200
         
     except Exception as e:
-        print(f"Get Profile Error: {e}")
-        traceback.print_exc()
+        log_info(f"Get Profile Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to load profile'}), 500
 
 
@@ -2346,6 +2343,8 @@ def update_profile():
         return jsonify({'message': 'Profile updated successfully'}), 200
         
     except Exception as e:
-        print(f"Update Profile Error: {e}")
-        traceback.print_exc()
+        log_info(f"Update Profile Error: {e}")
+        logger.exception("Unhandled backend error")
         return jsonify({'error': 'Failed to update profile'}), 500
+
+

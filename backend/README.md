@@ -4,20 +4,9 @@ This Flask backend exposes a MySQL-connected prediction API for the Somali Menta
 
 ## Setup
 
-1. Create the MySQL database:
+1. Confirm the existing MySQL database is available in phpMyAdmin.
 
-```sql
-CREATE DATABASE anxiety_prediction_system;
-USE anxiety_prediction_system;
-CREATE TABLE predictions (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  input_text TEXT,
-  cleaned_text TEXT,
-  prediction_result VARCHAR(50),
-  confidence_score FLOAT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
+The backend does not create, migrate, seed, or overwrite tables on startup. It connects to the configured MySQL database and uses the existing schema directly.
 
 2. Install Python dependencies:
 
@@ -50,13 +39,18 @@ python app.py
 
 Optional overrides:
 
-- `MYSQL_HOST`
-- `MYSQL_USER`
-- `MYSQL_PASSWORD`
-- `MYSQL_DB`
-- `MYSQL_PORT`
-- `OTP_DELIVERY_WEBHOOK_URL` - SMS delivery webhook. If set, OTPs are sent through this provider.
-- `DEVELOPMENT_OTP_MODE=true` - development only. When no OTP webhook is configured, generated OTPs are saved to `users.otp_code` and printed to the Flask console. Keep this unset or `false` in production so OTP delivery fails closed.
+- `DB_HOST` (`MYSQL_HOST` is still accepted for local backwards compatibility)
+- `DB_USER` (`MYSQL_USER` is still accepted)
+- `DB_PASSWORD` (`MYSQL_PASSWORD` is still accepted)
+- `DB_NAME` (`MYSQL_DB` is still accepted)
+- `DB_PORT` (`MYSQL_PORT` is still accepted)
+- `ALLOWED_ORIGINS` - comma-separated production frontend origins.
+- `UPLOAD_DIR` - persistent upload directory. Use `/var/data/anxietycare/uploads` on Render with a persistent disk.
+- `TABAARAK_SMS_USERNAME` - Tabaarak SMS gateway username.
+- `TABAARAK_SMS_PASSWORD` - Tabaarak SMS gateway password.
+- `TABAARAK_SMS_AUTH_URL` - optional override for Tabaarak auth endpoint.
+- `TABAARAK_SMS_SEND_URL` - optional override for Tabaarak send endpoint.
+- `TABAARAK_SMS_BALANCE_URL` - optional override for Tabaarak balance endpoint.
 - `HORMUUD_MERCHANT_API_URL` - Hormuud purchase endpoint. Required for real payments.
 - `HORMUUD_MERCHANT_STATUS_URL` - Hormuud transaction status endpoint. Required for pending-payment polling.
 - `HORMUUD_MERCHANT_UID`
