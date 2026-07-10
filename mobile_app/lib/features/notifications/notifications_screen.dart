@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_strings.dart';
@@ -13,13 +16,35 @@ class NotificationsScreen extends StatefulWidget {
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> {
+class _NotificationsScreenState extends State<NotificationsScreen> with WidgetsBindingObserver {
+  Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NotificationProvider>().loadNotifications();
     });
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) {
+        context.read<NotificationProvider>().loadNotifications(silent: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<NotificationProvider>().loadNotifications(silent: true);
+    }
   }
 
   @override
@@ -33,7 +58,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.mark_email_read),
+            icon: Icon(Icons.mark_chat_read_rounded),
             onPressed: () async {
               await context.read<NotificationProvider>().markAllRead();
             },
@@ -131,6 +156,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     onDelete: () async {
                       await provider.deleteNotification(notification.id);
                     },
+                    onOpen: () async {
+                      if (notification.status.toLowerCase() != 'read') {
+                        await provider.markAsRead(notification.id);
+                      }
+                      if (!context.mounted) return;
+                      if (notification.type.toLowerCase().startsWith('refund') && (notification.referenceId ?? '').isNotEmpty) {
+                        context.push('/refund_details', extra: notification.referenceId);
+                      }
+                    },
                   ),
                 ),
               ],
@@ -146,11 +180,13 @@ class _NotificationItem extends StatelessWidget {
   final NotificationModel notification;
   final VoidCallback onToggleRead;
   final VoidCallback onDelete;
+  final VoidCallback onOpen;
 
   const _NotificationItem({
     required this.notification,
     required this.onToggleRead,
     required this.onDelete,
+    required this.onOpen,
   });
 
   IconData _getIcon() {
@@ -159,6 +195,12 @@ class _NotificationItem extends StatelessWidget {
         return Icons.event;
       case 'payment_confirmation':
         return Icons.payment;
+      case 'refund_submitted':
+      case 'refund_approved':
+      case 'refund_rejected':
+      case 'refund_processing':
+      case 'refund_completed':
+        return Icons.receipt_long;
       case 'prediction_alert':
         return Icons.assessment;
       default:
@@ -172,6 +214,12 @@ class _NotificationItem extends StatelessWidget {
         return AppColors.lightPrimary;
       case 'payment_confirmation':
         return AppColors.lightSuccess;
+      case 'refund_submitted':
+      case 'refund_approved':
+      case 'refund_rejected':
+      case 'refund_processing':
+      case 'refund_completed':
+        return AppColors.lightPrimary;
       case 'prediction_alert':
         return AppColors.lightSecondary;
       default:
@@ -183,6 +231,7 @@ class _NotificationItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final isRead = notification.status.toLowerCase() == 'read';
     return CustomCard(
+      onTap: onOpen,
       marginBottom: const EdgeInsets.only(bottom: 12),
       borderRadius: 26,
       padding: const EdgeInsets.all(16),
@@ -258,6 +307,13 @@ class _NotificationItem extends StatelessWidget {
                 onPressed: onDelete,
                 child: Text('Delete'),
               ),
+              if (notification.type.toLowerCase().startsWith('refund') && (notification.referenceId ?? '').isNotEmpty) ...[
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: onOpen,
+                  child: const Text('Open'),
+                ),
+              ],
             ],
           ),
         ],

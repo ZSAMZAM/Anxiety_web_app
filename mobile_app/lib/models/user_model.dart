@@ -2,7 +2,6 @@ class UserModel {
   final String id;
   final String username;
   final String fullName;
-  final String? email;
   final String phone;
   final String? avatar;
   final String? gender;
@@ -27,7 +26,6 @@ class UserModel {
     required this.id,
     required this.username,
     required this.fullName,
-    this.email,
     required this.phone,
     this.avatar,
     this.gender,
@@ -54,7 +52,6 @@ class UserModel {
       id: json['id']?.toString() ?? '',
       username: json['username'] ?? '',
       fullName: json['fullname'] ?? json['full_name'] ?? json['name'] ?? '',
-      email: json['email'] as String?,
       phone: json['phone'] ?? '',
       avatar: json['avatar'] as String?,
       gender: json['gender'] as String?,

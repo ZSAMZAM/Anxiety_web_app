@@ -1,23 +1,74 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
+import '../../core/network/api_client.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/constants/app_strings.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/cards.dart';
 
-class BookingSuccessScreen extends StatelessWidget {
+class BookingSuccessScreen extends StatefulWidget {
+  final String paymentId;
+  final String bookingId;
+  final String doctorName;
   final String doctorId;
   final String referenceNumber;
   final String date;
   final String time;
+  final String paymentMethod;
+  final double amountPaid;
 
   const BookingSuccessScreen({
     Key? key,
+    required this.paymentId,
+    required this.bookingId,
+    required this.doctorName,
     required this.doctorId,
     required this.referenceNumber,
     required this.date,
     required this.time,
+    required this.paymentMethod,
+    required this.amountPaid,
   }) : super(key: key);
+
+  @override
+  State<BookingSuccessScreen> createState() => _BookingSuccessScreenState();
+}
+
+class _BookingSuccessScreenState extends State<BookingSuccessScreen> {
+  bool _downloadingReceipt = false;
+
+  Future<void> _downloadReceipt() async {
+    if (widget.paymentId.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Receipt is available after payment details are synced.')),
+      );
+      return;
+    }
+    setState(() => _downloadingReceipt = true);
+    try {
+      final bytes = await context.read<ApiService>().downloadPaymentReceipt(widget.paymentId);
+      if (bytes.isEmpty) {
+        throw Exception('Receipt file was empty.');
+      }
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}${Platform.pathSeparator}payment-receipt-${widget.paymentId}.pdf');
+      await file.writeAsBytes(bytes, flush: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Receipt downloaded: ${file.path}')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to download receipt. Please try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _downloadingReceipt = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +103,7 @@ class BookingSuccessScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               Text(
-                'Payment successful. Appointment confirmed.',
+                'Payment Successful',
                 style: Theme.of(context).textTheme.displaySmall,
                 textAlign: TextAlign.center,
               ),
@@ -70,18 +121,43 @@ class BookingSuccessScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _DetailRow(
-                      label: 'Reference Number',
-                      value: referenceNumber,
+                      label: 'Payment ID',
+                      value: widget.paymentId,
+                    ),
+                    Divider(height: 16),
+                    _DetailRow(
+                      label: 'Booking ID',
+                      value: widget.bookingId,
+                    ),
+                    Divider(height: 16),
+                    _DetailRow(
+                      label: 'Doctor',
+                      value: widget.doctorName,
+                    ),
+                    Divider(height: 16),
+                    _DetailRow(
+                      label: 'Transaction Reference',
+                      value: widget.referenceNumber,
                     ),
                     Divider(height: 16),
                     _DetailRow(
                       label: 'Date',
-                      value: date,
+                      value: widget.date,
                     ),
                     Divider(height: 16),
                     _DetailRow(
                       label: 'Time',
-                      value: time,
+                      value: widget.time,
+                    ),
+                    Divider(height: 16),
+                    _DetailRow(
+                      label: 'Payment Method',
+                      value: widget.paymentMethod,
+                    ),
+                    Divider(height: 16),
+                    _DetailRow(
+                      label: 'Amount Paid',
+                      value: '\$${widget.amountPaid.toStringAsFixed(2)}',
                     ),
                     Divider(height: 16),
                     _DetailRow(
@@ -127,7 +203,12 @@ class BookingSuccessScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               SecondaryButtonWidget(
-                label: 'Return Home',
+                label: 'Download Receipt',
+                onPressed: _downloadingReceipt ? null : _downloadReceipt,
+              ),
+              const SizedBox(height: 12),
+              SecondaryButtonWidget(
+                label: 'Back to Dashboard',
                 onPressed: () {
                   context.go('/dashboard');
                 },
@@ -174,7 +255,7 @@ class _DetailRow extends StatelessWidget {
 
 class SecondaryButtonWidget extends StatelessWidget {
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final double? width;
 
   const SecondaryButtonWidget({

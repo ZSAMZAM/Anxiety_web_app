@@ -10,7 +10,11 @@ import '../../core/widgets/cards.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/providers/doctor_provider.dart';
+import '../../core/providers/dashboard_provider.dart';
+import '../../providers/appointment_provider.dart';
+import '../../providers/notification_provider.dart';
 
+// Patient payment UI. Production payments call the merchant-backed backend endpoint.
 class PaymentScreen extends StatefulWidget {
   final String bookingId;
   final String doctorId;
@@ -91,7 +95,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       var status = _paymentStatus(payment);
       final transactionId = _paymentReference(payment);
 
-      if (status == 'pending') {
+      if (_isPendingStatus(status)) {
         final completedPayment = await _pollPaymentStatus(
           apiService: apiService,
           paymentId: payment['id']?.toString() ?? '',
@@ -107,10 +111,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ..clear()
           ..addAll(completedPayment);
         status = _paymentStatus(payment);
-      } else if (status != 'completed') {
+        if (!_isCompletedStatus(status)) {
+          if (mounted) {
+            setState(() => _statusMessage =
+                _paymentFailureMessage(payment, 'Payment was not completed. Please retry with your merchant wallet.'));
+          }
+          return;
+        }
+      } else if (!_isCompletedStatus(status)) {
         if (mounted) {
           setState(() => _statusMessage =
-              'Payment was not completed. Please retry with your merchant wallet.');
+              _paymentFailureMessage(payment, 'Payment was not completed. Please retry with your merchant wallet.'));
         }
         return;
       }
@@ -123,12 +134,29 @@ class _PaymentScreenState extends State<PaymentScreen> {
         );
         return;
       }
+      final paidDoctorName = context.read<DoctorProvider>().selectedDoctor?.name ?? 'Selected therapist';
 
-      context.push('/booking_success', extra: {
+      await Future.wait([
+        context.read<AppointmentProvider>().loadAppointments(),
+        context.read<DashboardProvider>().loadDashboard(silent: true),
+        context.read<NotificationProvider>().loadNotifications(silent: true),
+        context.read<DoctorProvider>().getDoctorById(widget.doctorId),
+      ]);
+
+      if (!mounted) return;
+      context.go('/booking_success', extra: {
+        'paymentId': payment['id']?.toString() ?? '',
+        'bookingId': widget.bookingId,
         'doctorId': widget.doctorId,
+        'doctorName': paidDoctorName,
         'referenceNumber': completedTransactionId,
         'date': widget.appointmentDate,
         'time': widget.appointmentTime,
+        'paymentMethod': payment['paymentMethod']?.toString() ??
+            payment['payment_method']?.toString() ??
+            _selectedMethod ??
+            'mwallet_account',
+        'amountPaid': payment['amount'] ?? widget.fee,
       });
     } catch (error) {
       final message = error is ApiException ? error.message : 'Unable to process payment.';
@@ -145,19 +173,25 @@ class _PaymentScreenState extends State<PaymentScreen> {
     if (paymentId.isEmpty) return null;
     setState(() => _statusMessage = 'Merchant processing. Waiting for confirmation...');
 
-    for (var attempt = 0; attempt < 6; attempt++) {
+    for (var attempt = 0; attempt < 12; attempt++) {
       await Future.delayed(const Duration(seconds: 5));
       if (!mounted) return null;
 
-      final response = await apiService.get(
-        AppConstants.paymentStatusEndpoint(paymentId),
-      );
-      final data = response.data as Map<String, dynamic>;
-      final payment = data['payment'] as Map<String, dynamic>? ?? {};
-      final status = _paymentStatus(payment);
+      try {
+        final response = await apiService.get(
+          AppConstants.paymentStatusEndpoint(paymentId),
+        );
+        final data = response.data as Map<String, dynamic>;
+        final payment = data['payment'] as Map<String, dynamic>? ?? {};
+        final status = _paymentStatus(payment);
 
-      if (status == 'completed') return payment;
-      if (status == 'failed') return null;
+        if (_isCompletedStatus(status) || _isFailedStatus(status)) return payment;
+      } catch (_) {
+        if (mounted) {
+          setState(() => _statusMessage =
+              'Still waiting for merchant confirmation. Please keep this screen open.');
+        }
+      }
     }
 
     return null;
@@ -165,6 +199,27 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   String _paymentStatus(Map<String, dynamic> payment) {
     return (payment['status'] ?? payment['payment_status'] ?? '').toString().toLowerCase();
+  }
+
+  bool _isCompletedStatus(String status) {
+    return ['completed', 'paid', 'success', 'successful', 'approved'].contains(status);
+  }
+
+  bool _isPendingStatus(String status) {
+    return status.isEmpty || ['pending', 'processing', 'accepted', 'inprogress', 'in_progress'].contains(status);
+  }
+
+  bool _isFailedStatus(String status) {
+    return ['failed', 'failure', 'cancelled', 'canceled', 'declined', 'rejected', 'error'].contains(status);
+  }
+
+  String _paymentFailureMessage(Map<String, dynamic> payment, String fallback) {
+    final value = payment['message'] ??
+        payment['failureReason'] ??
+        payment['failure_reason'] ??
+        payment['error'];
+    final message = value?.toString().trim() ?? '';
+    return message.isEmpty ? fallback : message;
   }
 
   String _paymentReference(Map<String, dynamic> payment) {

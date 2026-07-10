@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/language_provider.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/cards.dart';
@@ -12,37 +14,38 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
+    final languageProvider = context.watch<LanguageProvider>();
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(context.tr('settings'))),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
         children: [
           _SettingsHero(username: user?.username ?? 'Patient', phone: user?.phone ?? 'Phone not available'),
           const SizedBox(height: 18),
           _SettingsSection(
-            title: 'Appearance',
-            subtitle: 'Choose how AnxietyCare looks on this device.',
+            title: context.tr('appearance'),
+            subtitle: context.tr('chooseAppearance'),
             child: Consumer<ThemeProvider>(
               builder: (context, themeProvider, _) {
                 return Column(
                   children: [
                     _ThemeChoice(
                       icon: Icons.light_mode_rounded,
-                      title: 'Light Mode',
+                      title: context.tr('lightMode'),
                       subtitle: 'Bright, clean healthcare interface',
                       selected: themeProvider.themeMode == ThemeMode.light,
                       onTap: () => themeProvider.setThemeMode(ThemeMode.light),
                     ),
                     _ThemeChoice(
                       icon: Icons.dark_mode_rounded,
-                      title: 'Dark Mode',
+                      title: context.tr('darkMode'),
                       subtitle: 'Comfortable night reading',
                       selected: themeProvider.themeMode == ThemeMode.dark,
                       onTap: () => themeProvider.setThemeMode(ThemeMode.dark),
                     ),
                     _ThemeChoice(
                       icon: Icons.brightness_auto_rounded,
-                      title: 'System Default',
+                      title: context.tr('systemDefault'),
                       subtitle: 'Follow your phone settings',
                       selected: themeProvider.themeMode == ThemeMode.system,
                       onTap: () => themeProvider.setThemeMode(ThemeMode.system),
@@ -54,24 +57,41 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _SettingsSection(
-            title: 'Account',
+            title: context.tr('language'),
+            child: Column(
+              children: AppLocalizations.supportedLanguages.entries.map((entry) {
+                return RadioListTile<String>(
+                  value: entry.key,
+                  groupValue: languageProvider.languageCode,
+                  onChanged: (value) {
+                    if (value != null) languageProvider.setLanguage(value);
+                  },
+                  title: Text(entry.key == 'so' ? context.tr('somali') : context.tr('english')),
+                  secondary: const Icon(Icons.language_rounded),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _SettingsSection(
+            title: context.tr('account'),
             child: Column(
               children: [
                 _SettingsRow(
                   icon: Icons.person_rounded,
-                  title: 'Profile',
+                  title: context.tr('profile'),
                   subtitle: 'Personal information and photo',
                   onTap: () => context.push('/profile'),
                 ),
                 _SettingsRow(
                   icon: Icons.notifications_rounded,
-                  title: 'Notifications',
+                  title: context.tr('notifications'),
                   subtitle: 'Appointment, payment, and care updates',
                   onTap: () => context.push('/notifications'),
                 ),
                 _SettingsRow(
                   icon: Icons.history_rounded,
-                  title: 'Health history',
+                  title: context.tr('healthHistory'),
                   subtitle: 'Appointments and prediction records',
                   onTap: () => context.push('/appointment_history'),
                 ),
@@ -80,30 +100,30 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _SettingsSection(
-            title: 'Privacy & Security',
+            title: context.tr('privacySecurity'),
             child: Column(
               children: [
                 _SettingsRow(
                   icon: Icons.lock_rounded,
-                  title: 'Password',
+                  title: context.tr('password'),
                   subtitle: 'Change password from your profile',
                   onTap: () => context.push('/profile'),
                 ),
                 _SettingsRow(
                   icon: Icons.privacy_tip_rounded,
-                  title: 'Privacy',
+                  title: context.tr('privacy'),
                   subtitle: 'Your health data stays protected',
                   onTap: () {},
                 ),
                 _SettingsRow(
                   icon: Icons.help_rounded,
-                  title: 'Help & Support',
+                  title: context.tr('helpSupport'),
                   subtitle: 'Get help using AnxietyCare',
                   onTap: () {},
                 ),
                 _SettingsRow(
                   icon: Icons.info_rounded,
-                  title: 'About Application',
+                  title: context.tr('aboutApplication'),
                   subtitle: 'AnxietyCare mobile v1.0.0',
                   onTap: () {},
                 ),
@@ -116,8 +136,8 @@ class SettingsScreen extends StatelessWidget {
             child: ListTile(
               minVerticalPadding: 18,
               leading: _SettingsIcon(icon: Icons.logout_rounded, color: AppColors.lightDanger),
-              title: Text('Logout', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.lightDanger)),
-              subtitle: Text('Clear secure session and return to login', style: Theme.of(context).textTheme.bodyMedium),
+              title: Text(context.tr('logout'), style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.lightDanger)),
+              subtitle: Text(context.tr('clearSession'), style: Theme.of(context).textTheme.bodyMedium),
               onTap: () async {
                 await context.read<AuthProvider>().logout();
                 if (context.mounted) context.go('/login');

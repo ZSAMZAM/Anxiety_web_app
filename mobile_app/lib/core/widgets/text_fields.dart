@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../theme/app_colors.dart';
 
 class CustomTextField extends StatefulWidget {
   final String label;
@@ -12,6 +11,7 @@ class CustomTextField extends StatefulWidget {
   final VoidCallback? onTap;
   final String? Function(String?)? validator;
   final void Function(String)? onChanged;
+  final String? errorText;
   final int maxLines;
   final int minLines;
   final int? maxLength;
@@ -30,6 +30,7 @@ class CustomTextField extends StatefulWidget {
     this.onTap,
     this.validator,
     this.onChanged,
+    this.errorText,
     this.maxLines = 1,
     this.minLines = 1,
     this.maxLength,
@@ -78,6 +79,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
           inputFormatters: widget.inputFormatters,
           decoration: InputDecoration(
             hintText: widget.hintText,
+            errorText: widget.errorText,
             prefixIcon: widget.prefixIcon,
             suffixIcon: widget.obscureText
                 ? GestureDetector(

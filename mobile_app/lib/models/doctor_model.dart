@@ -1,7 +1,6 @@
 class DoctorModel {
   final String id;
   final String name;
-  final String? email;
   final String? userId;
   final String specialization;
   final int? experience;
@@ -18,7 +17,6 @@ class DoctorModel {
   DoctorModel({
     required this.id,
     required this.name,
-    this.email,
     this.userId,
     required this.specialization,
     this.experience,
@@ -29,6 +27,7 @@ class DoctorModel {
     this.avatar,
     this.createdAt,
     required this.fee,
+    this.specialty,
     this.availabilitySchedule,
   });
 
@@ -36,7 +35,6 @@ class DoctorModel {
     return DoctorModel(
       id: json['id']?.toString() ?? '',
       name: json['name'] ?? '',
-      email: json['email'] as String?,
       userId: json['user_id']?.toString(),
       specialization: json['specialization'] ?? json['specialty'] ?? '',
       experience: json['experience'] is int
@@ -50,7 +48,8 @@ class DoctorModel {
       createdAt: json['created_at'] as String?,
       fee: json['fee'] is num
           ? (json['fee'] as num).toDouble()
-          : double.tryParse((json['fee'] ?? json['consultation_fee'])?.toString() ?? '') ?? 0.0,
+          : double.tryParse((json['fee'] ?? json['cons_fee'] ?? json['consultation_fee'])?.toString() ?? '') ?? 0.0,
+      specialty: json['specialty']?.toString() ?? json['specialization']?.toString(),
       availabilitySchedule: json['availability_schedule'],
     );
   }

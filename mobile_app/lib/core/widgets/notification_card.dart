@@ -17,16 +17,16 @@ class NotificationCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(18),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(18),
           color: Theme.of(context).colorScheme.surface,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.06),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+              blurRadius: 14,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -34,15 +34,15 @@ class NotificationCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CircleAvatar(
-              radius: 22,
+              radius: 18,
               backgroundColor: isRead ? Colors.grey.shade800 : Colors.blueAccent,
               child: Icon(
-                isRead ? Icons.mark_email_read : Icons.notifications_active,
+                isRead ? Icons.mark_chat_read_rounded : Icons.notifications_active,
                 color: Colors.white,
-                size: 20,
+                size: 18,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -51,7 +51,7 @@ class NotificationCard extends StatelessWidget {
                     notification.message,
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [

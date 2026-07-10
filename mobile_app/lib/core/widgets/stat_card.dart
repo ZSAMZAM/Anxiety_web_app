@@ -20,34 +20,49 @@ class StatCard extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: gradient),
-        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          colors: gradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: gradient.last.withOpacity(0.25),
+            color: gradient.last.withOpacity(0.30),
             blurRadius: 18,
+            spreadRadius: -8,
             offset: const Offset(0, 10),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(11),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.white, size: 28),
-          const SizedBox(height: 20),
+          Container(
+            height: 34,
+            width: 34,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.18)),
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+          const SizedBox(height: 8),
           Text(
             value,
             style: theme.textTheme.headlineMedium?.copyWith(
               color: Colors.white,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
           Text(
             label,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withOpacity(0.88),
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],

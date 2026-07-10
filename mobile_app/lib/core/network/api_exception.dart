@@ -18,16 +18,17 @@ class ApiException implements Exception {
       }
       if (response != null && response.data != null) {
         final data = response.data;
-        if (data is Map<String, dynamic> && data['error'] != null) {
+        if (data is Map<String, dynamic> && (data['message'] != null || data['error'] != null)) {
+          final backendMessage = (data['message'] ?? data['error']).toString();
           return ApiException(
-            message: data['error'].toString(),
+            message: backendMessage,
             statusCode: statusCode,
           );
         }
       }
 
       if (statusCode == 401) {
-        return ApiException(message: 'Unauthorized. Please log in again.', statusCode: 401);
+        return ApiException(message: 'Your session expired. Please log in again.', statusCode: 401);
       }
       if (statusCode == 403) {
         return ApiException(message: 'Forbidden. You do not have access.', statusCode: 403);
@@ -43,6 +44,13 @@ class ApiException implements Exception {
           exception.type == DioExceptionType.receiveTimeout ||
           exception.type == DioExceptionType.sendTimeout) {
         return ApiException(message: 'Request timed out. Please check your connection.', statusCode: statusCode);
+      }
+      if (exception.type == DioExceptionType.connectionError ||
+          exception.type == DioExceptionType.unknown) {
+        return ApiException(
+          message: 'Server temporarily unavailable. Please try again.',
+          statusCode: statusCode,
+        );
       }
       if (exception.type == DioExceptionType.badResponse) {
         return ApiException(message: 'Server error. Please try again later.', statusCode: statusCode);

@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import '../providers/auth_provider.dart';
 import '../../features/auth/splash_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/register_screen.dart';
@@ -16,11 +17,38 @@ import '../../features/booking/booking_success_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/profile/appointment_history_screen.dart';
+import '../../features/profile/appointment_details_screen.dart';
 import '../../features/profile/prediction_history_screen.dart';
 import '../../features/profile/settings_screen.dart';
+import '../../features/refunds/refund_history_screen.dart';
+import '../../features/refunds/request_refund_screen.dart';
+import '../../features/refunds/refund_details_screen.dart';
+import '../../features/treatment_plan/treatment_plan_screen.dart';
+import '../../models/appointment_model.dart';
+import '../../models/refund_model.dart';
 
-final appRoutes = GoRouter(
+GoRouter createAppRouter(AuthProvider auth) => GoRouter(
   initialLocation: '/splash',
+  refreshListenable: auth,
+  redirect: (context, state) {
+    if (auth.isLoading) return null;
+
+    final authRoutes = {
+      '/splash',
+      '/login',
+      '/register',
+      '/verify_phone',
+      '/forgot_password',
+    };
+    final isAuthRoute = authRoutes.contains(state.matchedLocation);
+    if (!auth.isAuthenticated && !isAuthRoute) {
+      return '/login';
+    }
+    if (auth.isAuthenticated && ['/login', '/register'].contains(state.matchedLocation)) {
+      return '/dashboard';
+    }
+    return null;
+  },
   routes: [
     GoRoute(
       path: '/splash',
@@ -116,11 +144,20 @@ final appRoutes = GoRouter(
       builder: (context, state) {
         final args =
             state.extra as Map<String, dynamic>?;
+        final amountValue = args?['amountPaid'];
+        final amountPaid = amountValue is num
+            ? amountValue.toDouble()
+            : double.tryParse(amountValue?.toString() ?? '') ?? 0.0;
         return BookingSuccessScreen(
+          paymentId: args?['paymentId']?.toString() ?? '',
+          bookingId: args?['bookingId']?.toString() ?? '',
+          doctorName: args?['doctorName']?.toString() ?? 'Selected therapist',
           doctorId: args?['doctorId']?.toString() ?? '',
           referenceNumber: args?['referenceNumber']?.toString() ?? '',
           date: args?['date']?.toString() ?? '',
           time: args?['time']?.toString() ?? '',
+          paymentMethod: args?['paymentMethod']?.toString() ?? '',
+          amountPaid: amountPaid,
         );
       },
     ),
@@ -138,6 +175,48 @@ final appRoutes = GoRouter(
       path: '/appointment_history',
       builder: (context, state) =>
           const AppointmentHistoryScreen(),
+    ),
+    GoRoute(
+      path: '/appointment_details',
+      builder: (context, state) {
+        final appointment = state.extra as AppointmentModel?;
+        return appointment == null
+            ? const AppointmentHistoryScreen()
+            : AppointmentDetailsScreen(appointment: appointment);
+      },
+    ),
+    GoRoute(
+      path: '/request_refund',
+      builder: (context, state) {
+        final appointment = state.extra as AppointmentModel?;
+        return appointment == null
+            ? const AppointmentHistoryScreen()
+            : RequestRefundScreen(appointment: appointment);
+      },
+    ),
+    GoRoute(
+      path: '/refunds',
+      builder: (context, state) => const RefundHistoryScreen(),
+    ),
+    GoRoute(
+      path: '/treatment_plan',
+      builder: (context, state) => const TreatmentPlanScreen(),
+    ),
+    GoRoute(
+      path: '/treatment_plan/:reportId',
+      builder: (context, state) => TreatmentPlanScreen(
+        reportId: state.pathParameters['reportId'],
+      ),
+    ),
+    GoRoute(
+      path: '/refund_details',
+      builder: (context, state) {
+        final extra = state.extra;
+        return RefundDetailsScreen(
+          refund: extra is RefundModel ? extra : null,
+          refundId: extra is String ? extra : null,
+        );
+      },
     ),
     GoRoute(
       path: '/prediction_history',

@@ -34,6 +34,8 @@ class PredictionHistoryItem {
   final String anxietyLevel;
   final int confidence;
   final String summary;
+  final String sharingStatus;
+  final String statusLabel;
 
   PredictionHistoryItem({
     required this.id,
@@ -42,12 +44,14 @@ class PredictionHistoryItem {
     required this.anxietyLevel,
     required this.confidence,
     required this.summary,
+    required this.sharingStatus,
+    required this.statusLabel,
   });
 
   factory PredictionHistoryItem.fromJson(Map<String, dynamic> json) {
     return PredictionHistoryItem(
       id: json['id']?.toString() ?? '',
-      date: DateTime.tryParse(json['date']?.toString() ?? '') ?? DateTime.now(),
+      date: DateTime.tryParse(json['created_at']?.toString() ?? json['date']?.toString() ?? '') ?? DateTime.now(),
       status: json['result']?.toString() ?? json['anxietyLevel']?.toString() ?? '',
       anxietyLevel: json['anxietyLevel']?.toString() ?? json['result']?.toString() ?? '',
       confidence: json['confidence'] is int
@@ -55,7 +59,9 @@ class PredictionHistoryItem {
           : (json['confidence'] is num
               ? (json['confidence'] as num).round()
               : int.tryParse(json['confidence']?.toString() ?? '') ?? 0),
-      summary: json['summary']?.toString() ?? '',
+      summary: json['recommendation']?.toString() ?? json['summary']?.toString() ?? '',
+      sharingStatus: json['sharing_status']?.toString() ?? 'self_assessment',
+      statusLabel: json['status_label']?.toString() ?? 'Self Assessment (Not Shared)',
     );
   }
 }

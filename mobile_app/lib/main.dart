@@ -7,11 +7,14 @@ import 'core/providers/dashboard_provider.dart';
 import 'core/providers/assessment_provider.dart';
 import 'core/providers/doctor_provider.dart';
 import 'core/providers/booking_provider.dart';
+import 'core/providers/language_provider.dart';
 import 'core/providers/theme_provider.dart';
 import 'providers/profile_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/prediction_provider.dart';
 import 'providers/appointment_provider.dart';
+import 'providers/refund_provider.dart';
+import 'providers/treatment_plan_provider.dart';
 import 'core/routes/app_routes.dart';
 
 void main() {
@@ -87,22 +90,52 @@ class _MyAppState extends State<MyApp> {
             apiService: _apiService,
           ),
         ),
+        ChangeNotifierProvider<RefundProvider>(
+          create: (_) => RefundProvider(
+            apiService: _apiService,
+          ),
+        ),
+        ChangeNotifierProvider<TreatmentPlanProvider>(
+          create: (_) => TreatmentPlanProvider(
+            apiService: _apiService,
+          ),
+        ),
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider()..loadTheme(),
         ),
+        ChangeNotifierProvider<LanguageProvider>(
+          create: (_) => LanguageProvider()..loadLanguage(),
+        ),
       ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, _) {
-          return MaterialApp.router(
-            title: 'AnxietyCare',
-            theme: AppTheme.lightTheme(),
-            darkTheme: AppTheme.darkTheme(),
-            themeMode: themeProvider.themeMode,
-            routerConfig: appRoutes,
-            debugShowCheckedModeBanner: false,
-          );
-        },
-      ),
+      child: const _AppShell(),
+    );
+  }
+}
+
+class _AppShell extends StatefulWidget {
+  const _AppShell();
+
+  @override
+  State<_AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<_AppShell> {
+  late final _router = createAppRouter(context.read<AuthProvider>());
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer2<ThemeProvider, LanguageProvider>(
+      builder: (context, themeProvider, languageProvider, _) {
+        return MaterialApp.router(
+          title: 'AnxietyCare',
+          theme: AppTheme.lightTheme(),
+          darkTheme: AppTheme.darkTheme(),
+          themeMode: themeProvider.themeMode,
+          locale: Locale(languageProvider.languageCode),
+          routerConfig: _router,
+          debugShowCheckedModeBanner: false,
+        );
+      },
     );
   }
 }

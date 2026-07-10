@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_strings.dart';
@@ -105,13 +106,24 @@ class _AppointmentHistoryScreenState extends State<AppointmentHistoryScreen> wit
             date: apt.date,
             time: apt.time,
             hospital: '',
-            statusColor: statusColor,
-            status: apt.status,
+            statusColor: _statusColor(apt.effectiveStatus, statusColor),
+            status: apt.effectiveStatus,
           );
         },
       ),
     );
   }
+}
+
+Color _statusColor(String status, Color fallback) {
+  final value = status.toLowerCase();
+  if (value.contains('reject') || value.contains('cancel')) return AppColors.lightDanger;
+  if (value.contains('refund') && value.contains('pending')) return AppColors.lightWarning;
+  if (value.contains('refund') && value.contains('processing')) return AppColors.lightPrimary;
+  if (value.contains('refund') && value.contains('approved')) return AppColors.lightSuccess;
+  if (value.contains('refund') && value.contains('completed')) return AppColors.lightSuccess;
+  if (value.contains('payment')) return AppColors.lightWarning;
+  return fallback;
 }
 
 class _AppointmentCard extends StatelessWidget {
@@ -138,7 +150,7 @@ class _AppointmentCard extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: 12),
       child: CustomCard(
-        onTap: () => _showDetails(context),
+        onTap: () => context.push('/appointment_details', extra: appointment),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -178,6 +190,22 @@ class _AppointmentCard extends StatelessWidget {
                 Text(time),
               ],
             ),
+            if (appointment.isDelayed) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.lightWarning.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.lightWarning.withOpacity(0.35)),
+                ),
+                child: Text(
+                  'Your therapist needs additional time with the previous patient.\nOld: ${appointment.originalTime ?? time} - ${appointment.originalEndTime ?? appointment.endTime ?? ''}\nNew: ${appointment.time}${appointment.endTime?.isNotEmpty == true ? ' - ${appointment.endTime}' : ''}\nDelay: ${appointment.extensionMinutes} minutes',
+                  style: TextStyle(color: AppColors.lightWarning, fontWeight: FontWeight.w700, fontSize: 12),
+                ),
+              ),
+            ],
             if (hospital.isNotEmpty) ...[
               const SizedBox(height: 8),
               Row(
@@ -190,59 +218,13 @@ class _AppointmentCard extends StatelessWidget {
             ],
             if (appointment.hasRating) ...[
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(Icons.star_rounded, size: 18, color: AppColors.lightWarning),
-                  const SizedBox(width: 6),
-                  Text('You rated this session ${appointment.rating ?? 0}/5'),
-                ],
-              ),
+              _SubmittedReview(appointment: appointment),
             ] else if (appointment.canRate) ...[
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 icon: const Icon(Icons.star_rate_rounded),
-                label: const Text('Rate Session'),
+                label: const Text('Rate Your Doctor'),
                 onPressed: () => _showRatingDialog(context),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showDetails(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Appointment Details', style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 16),
-            _Detail(label: 'Doctor', value: appointment.doctorName),
-            _Detail(label: 'Date', value: appointment.date),
-            _Detail(label: 'Time', value: appointment.time),
-            _Detail(label: 'Phone', value: appointment.phone),
-            _Detail(label: 'Status', value: appointment.status),
-            if (appointment.hasRating) _Detail(label: 'Your Rating', value: '${appointment.rating ?? 0}/5'),
-            if ((appointment.ratingComment ?? '').isNotEmpty) _Detail(label: 'Comment', value: appointment.ratingComment!),
-            if (appointment.notes.isNotEmpty) _Detail(label: 'Notes', value: appointment.notes),
-            if (appointment.canRate) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.star_rate_rounded),
-                  label: const Text('Rate Session'),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _showRatingDialog(context);
-                  },
-                ),
               ),
             ],
           ],
@@ -254,16 +236,17 @@ class _AppointmentCard extends StatelessWidget {
   void _showRatingDialog(BuildContext context) {
     var selectedRating = 5;
     final commentController = TextEditingController();
+    const labels = ['Poor', 'Fair', 'Good', 'Very Good', 'Excellent'];
 
     showDialog(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Rate Your Session'),
+          title: const Text('Rate Your Doctor'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('How was your completed session with $doctor?'),
+              Text('How was your completed appointment with $doctor?'),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -279,14 +262,15 @@ class _AppointmentCard extends StatelessWidget {
                   );
                 }),
               ),
+              Text(labels[selectedRating - 1], style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 12),
               TextField(
                 controller: commentController,
                 maxLines: 3,
-                maxLength: 1000,
+                maxLength: 500,
                 decoration: const InputDecoration(
-                  labelText: 'Comment optional',
-                  hintText: 'Share your feedback',
+                  labelText: 'Feedback optional',
+                  hintText: 'Doctor was very helpful.',
                 ),
               ),
             ],
@@ -310,7 +294,7 @@ class _AppointmentCard extends StatelessWidget {
                   SnackBar(
                     content: Text(
                       success
-                          ? 'Thank you for rating your session.'
+                          ? 'Thank you for rating your doctor.'
                           : provider.error ?? 'Unable to submit rating.',
                     ),
                   ),
@@ -325,30 +309,49 @@ class _AppointmentCard extends StatelessWidget {
   }
 }
 
-class _Detail extends StatelessWidget {
-  final String label;
-  final String value;
+String _stars(int rating) {
+  final value = rating.clamp(0, 5);
+  return '${'★' * value}${'☆' * (5 - value)} $value/5';
+}
 
-  const _Detail({
-    required this.label,
-    required this.value,
-  });
+class _SubmittedReview extends StatelessWidget {
+  final AppointmentModel appointment;
+
+  const _SubmittedReview({required this.appointment});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.lightWarning.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.lightWarning.withOpacity(0.18)),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 96,
-            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+            'Your Rating: ${_stars(appointment.rating ?? 0)}',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppColors.lightWarning,
+                  fontWeight: FontWeight.w800,
+                ),
           ),
-          Expanded(child: Text(value, style: Theme.of(context).textTheme.bodyLarge)),
+          if ((appointment.ratingComment ?? '').isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text('Your Feedback: ${appointment.ratingComment!}'),
+          ],
+          if ((appointment.reviewCreatedAt ?? '').isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Submitted: ${appointment.reviewCreatedAt!.split('T').first}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
         ],
       ),
     );
   }
 }
-

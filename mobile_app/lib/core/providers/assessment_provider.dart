@@ -4,6 +4,8 @@ import '../network/api_client.dart';
 import '../network/api_exception.dart';
 import '../network/models.dart';
 
+// Submits patient assessment text to /api/predict and stores the latest
+// prediction/recommendation returned by the backend.
 class AssessmentProvider extends ChangeNotifier {
   final ApiService apiService;
 
@@ -12,6 +14,7 @@ class AssessmentProvider extends ChangeNotifier {
   List<String> _recommendations = [];
   bool _isLoading = false;
   String? _error;
+  bool _requiresLogin = false;
 
   AssessmentProvider({required this.apiService});
 
@@ -21,16 +24,27 @@ class AssessmentProvider extends ChangeNotifier {
   List<String> get recommendations => _recommendations;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  bool get requiresLogin => _requiresLogin;
 
   // Submit assessment
   Future<bool> submitAssessment(String text) async {
     _isLoading = true;
     _error = null;
+    _requiresLogin = false;
     _recommendations = [];
     _lastInput = text;
     notifyListeners();
 
     try {
+      final token = await apiService.getToken();
+      if (token == null || token.isEmpty) {
+        _requiresLogin = true;
+        _error = 'Your session is missing. Please log in again.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
       final response = await apiService.post(
         AppConstants.predictEndpoint,
         data: {'text': text},
@@ -44,14 +58,18 @@ class AssessmentProvider extends ChangeNotifier {
         final confidencePercent = rawConfidence <= 1 ? rawConfidence * 100 : rawConfidence;
         final className = data['class_name']?.toString() ?? data['result']?.toString() ?? '';
         _predictionResult = PredictionModel.fromJson({
-          'id': data['prediction']?.toString() ?? '',
+          'id': (data['prediction_id'] ?? data['id'] ?? data['prediction'])?.toString() ?? '',
           'status': className,
-          'recommendation':
-              'Detected $className with ${confidencePercent.round()}% confidence.',
-          'date': DateTime.now().toIso8601String(),
+          'recommendation': data['recommendation']?.toString().isNotEmpty == true
+              ? data['recommendation'].toString()
+              : 'Detected $className with ${confidencePercent.round()}% confidence.',
+          'date': data['created_at']?.toString() ?? DateTime.now().toIso8601String(),
           'details': {
             'confidence': confidencePercent,
             'result': data['result'],
+            'riskLevel': data['risk_level'] ?? data['anxiety_level'],
+            'canBookTherapist': data['can_book_therapist'] == true,
+            'bookingMessage': data['booking_message']?.toString(),
           },
         });
         _isLoading = false;
@@ -60,7 +78,16 @@ class AssessmentProvider extends ChangeNotifier {
       }
     } catch (error) {
       if (error is ApiException) {
-        _error = error.message;
+        if (error.statusCode == 401) {
+          _requiresLogin = true;
+          _error = 'Your session expired. Please log in again.';
+        } else if (error.message.toLowerCase().contains('network') ||
+            error.message.toLowerCase().contains('connection') ||
+            error.message.toLowerCase().contains('timed out')) {
+          _error = 'Network connection problem. Please check your internet and try again.';
+        } else {
+          _error = error.message;
+        }
       } else {
         _error = 'Unable to submit assessment.';
       }
@@ -80,6 +107,7 @@ class AssessmentProvider extends ChangeNotifier {
 
     _isLoading = true;
     _error = null;
+    _requiresLogin = false;
     notifyListeners();
 
     try {
@@ -102,7 +130,12 @@ class AssessmentProvider extends ChangeNotifier {
       }
     } catch (error) {
       if (error is ApiException) {
-        _error = error.message;
+        if (error.statusCode == 401) {
+          _requiresLogin = true;
+          _error = 'Your session expired. Please log in again.';
+        } else {
+          _error = error.message;
+        }
       } else {
         _error = 'Unable to load recommendations.';
       }
@@ -117,6 +150,7 @@ class AssessmentProvider extends ChangeNotifier {
     _predictionResult = null;
     _recommendations = [];
     _lastInput = null;
+    _requiresLogin = false;
     notifyListeners();
   }
 }

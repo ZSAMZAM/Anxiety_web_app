@@ -94,6 +94,7 @@ class _PredictionHistoryScreenState extends State<PredictionHistoryScreen> {
                   date: pred.date,
                   status: pred.status,
                   recommendation: pred.summary,
+                  sharingStatus: pred.statusLabel,
                   color: _getStatusColor(pred.status),
                 );
               },
@@ -109,12 +110,14 @@ class _PredictionCard extends StatelessWidget {
   final DateTime date;
   final String status;
   final String recommendation;
+  final String sharingStatus;
   final Color color;
 
   const _PredictionCard({
     required this.date,
     required this.status,
     required this.recommendation,
+    required this.sharingStatus,
     required this.color,
   });
 
@@ -146,6 +149,19 @@ class _PredictionCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                     ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.lock_outline_rounded, size: 18, color: color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    sharingStatus,
+                    style: Theme.of(context).textTheme.labelLarge,
                   ),
                 ),
               ],

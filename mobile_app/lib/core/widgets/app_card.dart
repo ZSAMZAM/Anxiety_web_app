@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
 
 class AppCard extends StatelessWidget {
   final Widget child;
@@ -11,8 +10,8 @@ class AppCard extends StatelessWidget {
   const AppCard({
     Key? key,
     required this.child,
-    this.padding = const EdgeInsets.all(20),
-    this.borderRadius = const BorderRadius.all(Radius.circular(24)),
+    this.padding = const EdgeInsets.all(14),
+    this.borderRadius = const BorderRadius.all(Radius.circular(18)),
     this.color,
     this.boxShadow,
   }) : super(key: key);
@@ -30,8 +29,8 @@ class AppCard extends StatelessWidget {
             color: theme.brightness == Brightness.dark
                 ? Colors.black.withOpacity(0.35)
                 : Colors.grey.withOpacity(0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            blurRadius: 18,
+            offset: const Offset(0, 9),
           ),
         ],
       ),

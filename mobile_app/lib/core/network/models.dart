@@ -67,11 +67,15 @@ class DoctorModel {
   final String location;
   final double fee;
   final double rating;
+  final int reviewCount;
+  final List<Map<String, dynamic>> recentReviews;
   final int experience;
   final String status;
   final String? photo;
   final String? biography;
   final dynamic availabilitySchedule;
+  final Map<String, dynamic> calendarSlots;
+  final DateTime? createdAt;
 
   DoctorModel({
     required this.id,
@@ -83,11 +87,15 @@ class DoctorModel {
     required this.location,
     required this.fee,
     required this.rating,
+    this.reviewCount = 0,
+    this.recentReviews = const [],
     required this.experience,
     required this.status,
     this.photo,
     this.biography,
     this.availabilitySchedule,
+    this.calendarSlots = const {},
+    this.createdAt,
   });
 
   List<String> get availableDays {
@@ -125,6 +133,32 @@ class DoctorModel {
   }
 
   List<Map<String, String>> slotsForDate(DateTime date) {
+    final dateKey = date.toIso8601String().split('T').first;
+    final calendarDay = calendarSlots[dateKey];
+    if (calendarDay is Map) {
+      if (calendarDay['blocked'] == true || calendarDay['available'] == false) {
+        return [];
+      }
+      final slots = calendarDay['slots'];
+      if (slots is List) {
+        final calendarSlotsForDate = slots
+            .whereType<Map>()
+            .where((slot) => _slotIsBookable(slot, date))
+            .map((slot) => {
+                  'start': slot['start']?.toString() ?? slot['start_time']?.toString() ?? '',
+                  'end': slot['end']?.toString() ?? slot['end_time']?.toString() ?? '',
+                })
+            .where((slot) => slot['start']!.isNotEmpty && slot['end']!.isNotEmpty)
+            .toList();
+        if (calendarSlotsForDate.isNotEmpty) {
+          return calendarSlotsForDate;
+        }
+      }
+    }
+    return _weeklySlotsForDate(date);
+  }
+
+  List<Map<String, String>> _weeklySlotsForDate(DateTime date) {
     final schedule = _normalizeAvailabilitySchedule(availabilitySchedule);
     if (schedule.isEmpty) return [];
     final dayKey = _weekdayKey(date);
@@ -135,17 +169,53 @@ class DoctorModel {
     final slots = daySchedule['slots'];
     if (slots is! List) return [];
     return slots
-        .whereType<Map>()
-        .map((slot) => {
-              'start': slot['start']?.toString() ?? '',
-              'end': slot['end']?.toString() ?? '',
+            .whereType<Map>()
+            .where((slot) => _slotIsBookable(slot, date))
+            .map((slot) => {
+                  'start': slot['start']?.toString() ?? slot['start_time']?.toString() ?? '',
+                  'end': slot['end']?.toString() ?? slot['end_time']?.toString() ?? '',
             })
         .where((slot) => slot['start']!.isNotEmpty && slot['end']!.isNotEmpty)
         .toList();
   }
 
+  bool _slotIsBookable(Map slot, DateTime date) {
+    final status = slot['status']?.toString().trim().toLowerCase() ?? '';
+    if (slot['booked'] == true) return false;
+    if (['booked', 'pending_payment', 'reserved', 'closed', 'disabled', 'expired', 'unavailable'].contains(status)) {
+      return false;
+    }
+    final start = slot['start']?.toString() ?? slot['start_time']?.toString() ?? '';
+    final parts = start.split(':');
+    if (parts.length >= 2) {
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+      if (hour != null && minute != null) {
+        final slotStart = DateTime(date.year, date.month, date.day, hour, minute);
+        if (slotStart.isBefore(DateTime.now())) return false;
+      }
+    }
+    return true;
+  }
+
   bool isAvailableOn(DateTime date) {
     return slotsForDate(date).isNotEmpty;
+  }
+
+  bool get hasUpcomingAvailability {
+    return nextAvailableDate() != null;
+  }
+
+  DateTime? nextAvailableDate({int daysAhead = 365}) {
+    final today = DateTime.now();
+    final start = DateTime(today.year, today.month, today.day);
+    for (var offset = 0; offset <= daysAhead; offset += 1) {
+      final date = start.add(Duration(days: offset));
+      if (slotsForDate(date).isNotEmpty) {
+        return date;
+      }
+    }
+    return null;
   }
 
   factory DoctorModel.fromJson(Map<String, dynamic> json) {
@@ -165,13 +235,22 @@ class DoctorModel {
           json['clinic_address']?.toString() ??
           json['address']?.toString() ??
           '',
-      fee: _toDouble(json['fee'] ?? json['consultation_fee']),
-      rating: _toDouble(json['rating']),
+      fee: _toDouble(json['fee'] ?? json['cons_fee'] ?? json['consultation_fee']),
+      rating: _toDouble(json['average_rating'] ?? json['rating']),
+      reviewCount: _toInt(json['review_count'] ?? json['total_reviews']),
+      recentReviews: (json['recent_reviews'] as List<dynamic>? ?? [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList(),
       experience: _toInt(json['experience'] ?? json['experience_years']),
       status: json['status']?.toString() ?? 'ACTIVE',
       photo: json['photo']?.toString() ?? json['image']?.toString() ?? json['avatar']?.toString(),
       biography: json['bio'] ?? json['biography'],
       availabilitySchedule: json['availability_schedule'] ?? json['availabilitySchedule'],
+      calendarSlots: json['calendar_slots'] is Map
+          ? Map<String, dynamic>.from(json['calendar_slots'] as Map)
+          : const {},
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? json['createdAt']?.toString() ?? ''),
     );
   }
 
@@ -186,12 +265,17 @@ class DoctorModel {
       'location': location,
       'fee': fee,
       'rating': rating,
+      'average_rating': rating,
+      'review_count': reviewCount,
+      'recent_reviews': recentReviews,
       'experience': experience,
       'status': status,
       'photo': photo,
       'biography': biography,
       'available_days': availableDays,
       'available_time_slots': availableTimeSlots,
+      'calendar_slots': calendarSlots,
+      'created_at': createdAt?.toIso8601String(),
     };
   }
 }
@@ -274,7 +358,7 @@ class AppointmentModel {
       time: json['time']?.toString() ?? json['appointment_time']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
       notes: json['notes']?.toString(),
-      fee: _toDouble(json['fee'] ?? json['consultation_fee']),
+      fee: _toDouble(json['fee'] ?? json['cons_fee'] ?? json['consultation_fee']),
       referenceNumber: json['reference_number']?.toString() ?? json['referenceNumber']?.toString(),
     );
   }
@@ -379,8 +463,8 @@ Map<String, dynamic> _normalizeAvailabilitySchedule(dynamic value) {
         ? rawSlots
             .whereType<Map>()
             .map((slot) => {
-                  'start': slot['start']?.toString() ?? '',
-                  'end': slot['end']?.toString() ?? '',
+                  'start': slot['start']?.toString() ?? slot['start_time']?.toString() ?? '',
+                  'end': slot['end']?.toString() ?? slot['end_time']?.toString() ?? '',
                 })
             .where((slot) => slot['start']!.isNotEmpty && slot['end']!.isNotEmpty)
             .toList()

@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/language_provider.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/buttons.dart';
 import '../../core/widgets/dialogs.dart';
 import '../../core/widgets/text_fields.dart';
 
@@ -47,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
     if (!mounted) return;
     if (success) {
-      showSuccessSnackbar(context, AppStrings.loginSuccess);
+      showSuccessSnackbar(context, context.tr('loginSuccess'));
       context.go('/dashboard');
     } else {
       showErrorSnackbar(context, authProvider.error ?? AppStrings.invalidCredentials);
@@ -64,8 +65,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: isDark
-                ? [AppColors.darkBackground, const Color(0xFF0D1D2F)]
-                : [const Color(0xFFEAF7FB), AppColors.lightBackground],
+                ? AppColors.darkCalmGradient
+                : AppColors.calmGradient,
           ),
         ),
         child: SafeArea(
@@ -74,31 +75,54 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             child: SlideTransition(
               position: _slide,
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(24, 18, 24, 30),
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
                 children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Consumer<LanguageProvider>(
+                      builder: (context, languageProvider, _) {
+                        return DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: languageProvider.languageCode,
+                            borderRadius: BorderRadius.circular(18),
+                            icon: const Icon(Icons.language_rounded),
+                            items: AppLocalizations.supportedLanguages.entries.map((entry) {
+                              return DropdownMenuItem(
+                                value: entry.key,
+                                child: Text(entry.key == 'so' ? context.tr('somali') : context.tr('english')),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              if (value != null) languageProvider.setLanguage(value);
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   _HeroIllustration(isDark: isDark),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 18),
                   Text(
-                    'Welcome to AnxietyCare',
+                    context.tr('welcomeToAnxietyCare'),
                     style: Theme.of(context).textTheme.displaySmall,
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Private mental health support, assessments, doctors, bookings, and updates in one calm space.',
+                    context.tr('loginSubtitle'),
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 18),
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkCard.withOpacity(0.92) : Colors.white.withOpacity(0.92),
-                      borderRadius: BorderRadius.circular(30),
+                      color: isDark ? AppColors.darkSecondaryCard.withOpacity(0.88) : Colors.white.withOpacity(0.94),
+                      borderRadius: BorderRadius.circular(28),
                       border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(isDark ? 0.25 : 0.08),
-                          blurRadius: 30,
+                          color: isDark ? Colors.black.withOpacity(0.30) : AppColors.lightPrimary.withOpacity(0.10),
+                          blurRadius: 34,
                           spreadRadius: -12,
                           offset: const Offset(0, 20),
                         ),
@@ -109,31 +133,31 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Sign in securely', style: Theme.of(context).textTheme.headlineSmall),
+                          Text(context.tr('signInSecurely'), style: Theme.of(context).textTheme.headlineSmall),
                           const SizedBox(height: 6),
-                          Text('Patient accounts only on mobile.', style: Theme.of(context).textTheme.bodyMedium),
-                          const SizedBox(height: 22),
+                          Text(context.tr('patientAccountsOnly'), style: Theme.of(context).textTheme.bodyMedium),
+                          const SizedBox(height: 16),
                           CustomTextField(
-                            label: AppStrings.username,
-                            hintText: 'Enter your username',
+                            label: context.tr('username'),
+                            hintText: context.tr('enterUsername'),
                             controller: _usernameController,
                             prefixIcon: const Icon(Icons.person_rounded),
                             validator: (value) {
                               final trimmed = value?.trim() ?? '';
-                              if (trimmed.isEmpty) return 'Username is required.';
+                              if (trimmed.isEmpty) return context.tr('usernameRequired');
                               if (trimmed.length < 3) return AppStrings.invalidUsername;
                               return null;
                             },
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 14),
                           CustomTextField(
-                            label: AppStrings.password,
-                            hintText: 'Enter your password',
+                            label: context.tr('password'),
+                            hintText: context.tr('enterPassword'),
                             controller: _passwordController,
                             obscureText: true,
                             prefixIcon: const Icon(Icons.lock_rounded),
                             validator: (value) {
-                              if (value?.isEmpty ?? true) return 'Password is required.';
+                              if (value?.isEmpty ?? true) return context.tr('passwordRequired');
                               if (value!.length < 6) return AppStrings.passwordTooShort;
                               return null;
                             },
@@ -143,16 +167,61 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             alignment: Alignment.centerRight,
                             child: TextButton(
                               onPressed: () => context.push('/forgot_password'),
-                              child: Text(AppStrings.forgotPassword),
+                              child: Text(context.tr('forgotPassword')),
                             ),
                           ),
                           const SizedBox(height: 14),
                           Consumer<AuthProvider>(
                             builder: (context, authProvider, _) {
-                              return GradientButton(
-                                label: AppStrings.login,
-                                onPressed: _handleLogin,
-                                isLoading: authProvider.isLoading,
+                              return Container(
+                                height: 58,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: AppColors.primaryGradient,
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primaryGradient.first.withOpacity(0.3),
+                                      blurRadius: 22,
+                                      spreadRadius: -6,
+                                      offset: const Offset(0, 14),
+                                    ),
+                                  ],
+                                ),
+                                child: ElevatedButton(
+                                  key: const ValueKey('mobile-login-submit'),
+                                  onPressed: authProvider.isLoading ? null : _handleLogin,
+                                  style: ElevatedButton.styleFrom(
+                                    elevation: 0,
+                                    shadowColor: Colors.transparent,
+                                    backgroundColor: Colors.transparent,
+                                    disabledBackgroundColor: Colors.transparent,
+                                    foregroundColor: Colors.white,
+                                    disabledForegroundColor: Colors.white70,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                  ),
+                                  child: authProvider.isLoading
+                                      ? const SizedBox(
+                                          height: 24,
+                                          width: 24,
+                                          child: CircularProgressIndicator(
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : Text(
+                                          context.tr('login'),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                ),
                               );
                             },
                           ),
@@ -160,14 +229,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       ),
                     ),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(AppStrings.dontHaveAccount, style: Theme.of(context).textTheme.bodyMedium),
+                      Text(context.tr('dontHaveAccount'), style: Theme.of(context).textTheme.bodyMedium),
                       TextButton(
-                        onPressed: () => context.push('/register'),
-                        child: Text(AppStrings.signUp),
+                        onPressed: () {
+                          FocusScope.of(context).unfocus();
+                          context.push('/register');
+                        },
+                        child: Text(context.tr('signUp')),
                       ),
                     ],
                   ),

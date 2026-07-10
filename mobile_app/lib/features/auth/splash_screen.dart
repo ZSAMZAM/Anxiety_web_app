@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_strings.dart';
@@ -15,30 +16,30 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  Timer? _navigationTimer;
+
   @override
   void initState() {
     super.initState();
-    _navigateToNext();
+    _navigationTimer = Timer(Duration(seconds: AppConstants.splashDuration), _navigateToNext);
   }
 
-  void _navigateToNext() async {
-    await Future.delayed(Duration(seconds: AppConstants.splashDuration));
+  @override
+  void dispose() {
+    _navigationTimer?.cancel();
+    super.dispose();
+  }
+
+  void _navigateToNext() {
     if (!mounted) return;
 
     final authProvider = context.read<AuthProvider>();
-    if (authProvider.isAuthenticated) {
-      context.go('/dashboard');
+    if (authProvider.isLoading) {
+      _navigationTimer?.cancel();
+      _navigationTimer = Timer(const Duration(milliseconds: 150), _navigateToNext);
       return;
     }
 
-    if (authProvider.isLoading) {
-      await Future.doWhile(() async {
-        await Future.delayed(Duration(milliseconds: 100));
-        return authProvider.isLoading && mounted;
-      });
-    }
-
-    if (!mounted) return;
     context.go(authProvider.isAuthenticated ? '/dashboard' : '/login');
   }
 

@@ -3,9 +3,12 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/network/api_client.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/cards.dart';
+import '../../core/widgets/safe_image.dart';
 import '../../core/widgets/text_fields.dart';
 import '../../core/providers/booking_provider.dart';
 import '../../core/providers/doctor_provider.dart';
@@ -21,13 +24,17 @@ class BookingScreen extends StatefulWidget {
 
 class _BookingScreenState extends State<BookingScreen> {
   final _notesController = TextEditingController();
-  final _phoneController = TextEditingController();
+  bool _assessmentChecked = false;
+  bool _hasAssessment = false;
+  bool _hasAnyAssessment = false;
+  String _assessmentMessage = 'Complete your mental health assessment before booking a therapist.';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadDoctorDetails();
+      _loadAssessmentStatus();
     });
   }
 
@@ -44,7 +51,6 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   void dispose() {
     _notesController.dispose();
-    _phoneController.dispose();
     super.dispose();
   }
 
@@ -55,21 +61,74 @@ class _BookingScreenState extends State<BookingScreen> {
     return context.read<DoctorProvider>().getDoctorById(widget.doctorId);
   }
 
+  Future<void> _loadAssessmentStatus() async {
+    try {
+      final response = await context.read<ApiService>().get(AppConstants.historyEndpoint);
+      final data = response.data as Map<String, dynamic>? ?? {};
+      if (!mounted) return;
+      setState(() {
+        _hasAssessment = data['can_book_therapist'] == true;
+        _hasAnyAssessment = data['has_assessment'] == true || ((data['history'] as List<dynamic>? ?? []).isNotEmpty);
+        _assessmentMessage = data['booking_message']?.toString() ??
+            'Complete your mental health assessment before booking a therapist.';
+        _assessmentChecked = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _hasAssessment = false;
+        _hasAnyAssessment = false;
+        _assessmentMessage = 'Complete your mental health assessment before booking a therapist.';
+        _assessmentChecked = true;
+      });
+    }
+  }
+
   void _selectDate() async {
     final doctorProvider = context.read<DoctorProvider>();
     final selectedDoctor = doctorProvider.selectedDoctor;
     final doctor = selectedDoctor?.id == widget.doctorId
         ? selectedDoctor
         : null;
+    if (doctor == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Doctor details are still loading.')),
+      );
+      return;
+    }
+
+    if (!_assessmentChecked || !_hasAssessment) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_assessmentMessage),
+        ),
+      );
+      return;
+    }
+
+    final nextAvailableDate = doctor.nextAvailableDate();
+    if (nextAvailableDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This doctor has not published available booking times yet.'),
+        ),
+      );
+      return;
+    }
+
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+
     final date = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(Duration(days: 90)),
+      initialDate: nextAvailableDate,
+      firstDate: todayDate,
+      lastDate: todayDate.add(Duration(days: 365)),
+      selectableDayPredicate: (day) => doctor.isAvailableOn(day),
     );
 
     if (date != null) {
-      if (doctor != null && !doctor.isAvailableOn(date)) {
+      if (!doctor.isAvailableOn(date)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('The doctor is not available on this day.'),
@@ -106,7 +165,7 @@ class _BookingScreenState extends State<BookingScreen> {
               return value.length >= 5 ? value.substring(0, 5) : value;
             })
             .toSet();
-        final slots = _slotOptions(doctor?.slotsForDate(selectedDate) ?? []);
+        final slots = doctor?.slotsForDate(selectedDate) ?? [];
         return AlertDialog(
           title: Text('Select Time'),
           content: SingleChildScrollView(
@@ -120,12 +179,13 @@ class _BookingScreenState extends State<BookingScreen> {
                       final label = '$start - $end';
                       final isBooked = bookedTimes.contains(start);
                       final isPast = _isPastSlot(selectedDate, start);
+                      final isToday = _isSameDate(selectedDate, DateTime.now());
                       final disabled = isBooked || isPast;
                       return ListTile(
                         enabled: !disabled,
                         title: Text(label),
                         subtitle: disabled
-                            ? Text(isBooked ? 'Booked' : 'Past time')
+                            ? Text(isBooked ? 'Booked' : isToday ? "today's time is over" : 'Past time')
                             : const Text('Available'),
                         trailing: disabled
                             ? const Icon(Icons.block)
@@ -160,6 +220,13 @@ class _BookingScreenState extends State<BookingScreen> {
       return;
     }
 
+    if (!_assessmentChecked || !_hasAssessment) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_assessmentMessage)),
+      );
+      return;
+    }
+
     if (bookingProvider.selectedDate == null ||
         bookingProvider.selectedTime == null) {
       ScaffoldMessenger.of(
@@ -187,29 +254,9 @@ class _BookingScreenState extends State<BookingScreen> {
       return;
     }
 
-    if (_phoneController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Please enter your phone number')));
-      return;
-    }
-
-    final phonePattern = RegExp(r'^\+252(61|62|63|65|66|67|68|69|77|90)\d{7}$');
-    if (!phonePattern.hasMatch(_phoneController.text.trim())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Enter a valid Somali phone number, e.g. +25261XXXXXXX',
-          ),
-        ),
-      );
-      return;
-    }
-
     final success = await bookingProvider.confirmBooking(
       widget.doctorId,
       doctorName: doctor.name,
-      phone: _phoneController.text.trim(),
     );
 
     if (!success) {
@@ -291,6 +338,42 @@ class _BookingScreenState extends State<BookingScreen> {
             );
           }
 
+          if (_assessmentChecked && !_hasAssessment) {
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(24),
+              children: [
+                CustomCard(
+                  borderRadius: 24,
+                  padding: const EdgeInsets.all(18),
+                  backgroundColor: AppColors.lightWarning.withOpacity(0.10),
+                  border: Border.all(
+                    color: AppColors.lightWarning.withOpacity(0.28),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.psychology_rounded, color: AppColors.lightWarning),
+                      const SizedBox(height: 12),
+                      Text(
+                        _assessmentMessage,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      GradientButton(
+                        label: _hasAnyAssessment ? 'View History' : 'Start Assessment',
+                        onPressed: () => _hasAnyAssessment
+                            ? context.go('/prediction_history')
+                            : context.go('/assessment'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+          final hasAvailability = doctor.hasUpcomingAvailability;
+
           return RefreshIndicator(
             onRefresh: _loadDoctorDetails,
             child: SingleChildScrollView(
@@ -353,9 +436,11 @@ class _BookingScreenState extends State<BookingScreen> {
                             borderRadius: BorderRadius.circular(16),
                             color: AppColors.lightBorder,
                           ),
-                          child: doctor.photo != null
-                              ? Image.network(doctor.photo!, fit: BoxFit.cover)
-                              : Icon(Icons.person),
+                          child: SafeImage(
+                            url: doctor.photo,
+                            fit: BoxFit.cover,
+                            fallback: Icon(Icons.person),
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -371,7 +456,7 @@ class _BookingScreenState extends State<BookingScreen> {
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                               Text(
-                                '\$${doctor.fee.toStringAsFixed(2)}',
+                                '\$${doctor.fee.toStringAsFixed(2)} USD',
                                 style: Theme.of(context).textTheme.titleLarge
                                     ?.copyWith(color: AppColors.lightPrimary),
                               ),
@@ -382,6 +467,43 @@ class _BookingScreenState extends State<BookingScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  if (!hasAvailability) ...[
+                    CustomCard(
+                      borderRadius: 24,
+                      padding: const EdgeInsets.all(16),
+                      backgroundColor: AppColors.lightWarning.withOpacity(0.10),
+                      border: Border.all(
+                        color: AppColors.lightWarning.withOpacity(0.28),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.info_rounded,
+                            color: AppColors.lightWarning,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'No availability published yet',
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'This is a new doctor account. Booking dates will appear after the doctor or administrator adds working hours in the schedule page.',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                   // Date Selection
                   Text(
                     AppStrings.selectedDate,
@@ -391,6 +513,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   GestureDetector(
                     onTap: _selectDate,
                     child: CustomCard(
+                      backgroundColor: hasAvailability ? null : AppColors.lightGrey.withOpacity(0.10),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -404,7 +527,9 @@ class _BookingScreenState extends State<BookingScreen> {
                           ),
                           Icon(
                             Icons.calendar_today,
-                            color: AppColors.lightPrimary,
+                            color: hasAvailability
+                                ? AppColors.lightPrimary
+                                : AppColors.lightGrey,
                           ),
                         ],
                       ),
@@ -434,19 +559,6 @@ class _BookingScreenState extends State<BookingScreen> {
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Phone
-                  Text(
-                    AppStrings.phoneNumber,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 12),
-                  CustomTextField(
-                    label: AppStrings.phoneNumber,
-                    hintText: '+252 61 234 5678',
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
                   ),
                   const SizedBox(height: 24),
                   // Notes
@@ -499,7 +611,7 @@ class _BookingScreenState extends State<BookingScreen> {
                         ),
                         _ReviewRow(
                           label: 'Fee',
-                          value: '\$${doctor.fee.toStringAsFixed(2)}',
+                          value: '\$${doctor.fee.toStringAsFixed(2)} USD',
                         ),
                       ],
                     ),
@@ -534,36 +646,10 @@ class _BookingScreenState extends State<BookingScreen> {
     return slotDateTime.isBefore(DateTime.now());
   }
 
-  List<Map<String, String>> _slotOptions(List<Map<String, String>> ranges) {
-    final slots = <Map<String, String>>[];
-    for (final range in ranges) {
-      final start = _parseClock(range['start'] ?? '');
-      final end = _parseClock(range['end'] ?? '');
-      if (start == null || end == null || !start.isBefore(end)) continue;
-
-      var cursor = start;
-      while (cursor.isBefore(end)) {
-        final next = cursor.add(const Duration(hours: 1));
-        if (next.isAfter(end)) break;
-        slots.add({'start': _formatClock(cursor), 'end': _formatClock(next)});
-        cursor = next;
-      }
-    }
-    return slots;
+  bool _isSameDate(DateTime left, DateTime right) {
+    return left.year == right.year && left.month == right.month && left.day == right.day;
   }
 
-  DateTime? _parseClock(String value) {
-    final parts = value.split(':');
-    if (parts.length < 2) return null;
-    final hour = int.tryParse(parts[0]);
-    final minute = int.tryParse(parts[1]);
-    if (hour == null || minute == null) return null;
-    return DateTime(2000, 1, 1, hour, minute);
-  }
-
-  String _formatClock(DateTime value) {
-    return '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
-  }
 }
 
 class _ReviewRow extends StatelessWidget {

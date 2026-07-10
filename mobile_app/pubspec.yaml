@@ -54,6 +54,7 @@ dependencies:
   
   # Internationalization
   intl: ^0.18.1
+  path_provider: ^2.1.5
   
   # UI Components
   flutter_svg: ^2.0.9

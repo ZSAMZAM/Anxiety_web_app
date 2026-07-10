@@ -20,7 +20,15 @@ class _PredictionResultScreenState extends State<PredictionResultScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<AssessmentProvider>();
-      if (provider.predictionResult != null && provider.recommendations.isEmpty) {
+      final status = provider.predictionResult?.status.toLowerCase() ?? '';
+      final needsProfessionalSupport =
+          status.contains('anxiety') ||
+          status.contains('depression') ||
+          status.contains('moderate') ||
+          status.contains('high risk');
+      if (provider.predictionResult != null &&
+          !needsProfessionalSupport &&
+          provider.recommendations.isEmpty) {
         provider.loadRecommendations();
       }
     });
@@ -39,8 +47,13 @@ class _PredictionResultScreenState extends State<PredictionResultScreen> {
 
           final status = prediction.status;
           final normalized = status.toLowerCase();
-          final isCritical = normalized.contains('anxiety') || normalized.contains('depression');
+          final isCritical = normalized.contains('anxiety') ||
+              normalized.contains('depression') ||
+              normalized.contains('moderate') ||
+              normalized.contains('high risk');
           final isDepression = normalized.contains('depression');
+          final canBookTherapist = prediction.details['canBookTherapist'] == true;
+          final bookingMessage = prediction.details['bookingMessage']?.toString();
           final confidence = _confidence(prediction.details['confidence']);
           final risk = isDepression ? 'High attention' : isCritical ? 'Moderate risk' : 'Stable';
           final color = isDepression ? AppColors.lightDanger : isCritical ? AppColors.lightWarning : AppColors.lightSuccess;
@@ -86,16 +99,28 @@ class _PredictionResultScreenState extends State<PredictionResultScreen> {
                     children: [
                       Row(
                         children: [
-                          _IconTile(icon: Icons.analytics_rounded, color: color),
+                          _IconTile(
+                            icon: isCritical
+                                ? Icons.health_and_safety_rounded
+                                : Icons.celebration_rounded,
+                            color: color,
+                          ),
                           const SizedBox(width: 12),
-                          Expanded(child: Text('Clinical insight', style: Theme.of(context).textTheme.titleLarge)),
+                          Expanded(
+                            child: Text(
+                              isCritical
+                                  ? 'We Recommend Speaking with a Mental Health Professional'
+                                  : 'Great News!',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 14),
                       Text(
                         isCritical
-                            ? 'Your response suggests symptoms that may benefit from professional support and continued monitoring.'
-                            : 'Your response appears stable today. Continue healthy routines and check in again when your mood changes.',
+                            ? 'Your assessment indicates signs of anxiety or depression. This is not a medical diagnosis, but speaking with a qualified professional may help you understand your situation and receive appropriate support. Getting help early can make recovery easier.'
+                            : 'Your assessment suggests that your mental health is currently in a healthy range. Keep taking care of yourself with healthy habits and regular check-ins.',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 16),
@@ -106,7 +131,8 @@ class _PredictionResultScreenState extends State<PredictionResultScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                CustomCard(
+                if (!isCritical)
+                  CustomCard(
                   borderRadius: 30,
                   padding: const EdgeInsets.all(20),
                   child: Column(
@@ -139,12 +165,29 @@ class _PredictionResultScreenState extends State<PredictionResultScreen> {
                   ),
                 ),
                 const SizedBox(height: 22),
-                if (isCritical)
-                  GradientButton(label: 'Find a therapist', onPressed: () => context.push('/doctors'))
+                if (canBookTherapist)
+                  GradientButton(label: 'Book Therapist', onPressed: () => context.push('/doctors'))
                 else
-                  GradientButton(label: 'Back to dashboard', onPressed: () => context.go('/dashboard')),
+                  GradientButton(
+                    label: isCritical ? 'View Assessment History' : 'View Assessment History',
+                    onPressed: () => context.push('/prediction_history'),
+                  ),
+                if (isCritical && !canBookTherapist && bookingMessage != null && bookingMessage.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    bookingMessage,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
                 const SizedBox(height: 12),
-                SecondaryButton(label: 'View history', onPressed: () => context.push('/prediction_history')),
+                SecondaryButton(
+                  label: isCritical
+                      ? 'View Assessment Details'
+                      : 'Take Another Assessment Later',
+                  onPressed: () => isCritical
+                      ? context.push('/prediction_history')
+                      : context.go('/dashboard'),
+                ),
               ],
             ),
           );

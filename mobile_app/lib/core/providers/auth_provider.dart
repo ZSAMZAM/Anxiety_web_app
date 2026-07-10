@@ -4,12 +4,14 @@ import '../network/api_client.dart';
 import '../network/api_exception.dart';
 import '../network/models.dart';
 
+// Handles the patient-only authentication flow. The backend rejects web-only
+// roles when this provider sends platform: mobile during login.
 class AuthProvider extends ChangeNotifier {
   final ApiService apiService;
 
   UserModel? _user;
   bool _isAuthenticated = false;
-  bool _isLoading = false;
+  bool _isLoading = true;
   String? _error;
   String? _pendingVerificationPhone;
   String? _pendingUsername;
@@ -17,7 +19,9 @@ class AuthProvider extends ChangeNotifier {
 
   AuthProvider({
     required this.apiService,
-  });
+  }) {
+    apiService.onUnauthorized = _handleUnauthorized;
+  }
 
   // Getters
   UserModel? get user => _user;
@@ -26,20 +30,50 @@ class AuthProvider extends ChangeNotifier {
   String? get error => _error;
   String? get pendingVerificationPhone => _pendingVerificationPhone;
 
+  Future<bool> isPhoneAvailable(String phone) async {
+    try {
+      final response = await apiService.post(
+        AppConstants.phoneAvailabilityEndpoint,
+        data: {'phone': phone},
+      );
+      final data = response.data as Map<String, dynamic>? ?? {};
+      return response.statusCode == 200 && data['success'] == true;
+    } catch (error) {
+      if (error is ApiException) {
+        _error = error.message;
+      } else {
+        _error = 'Unable to validate phone number.';
+      }
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> initAuth() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
     final token = await apiService.getToken();
     if (token != null) {
-      _isLoading = true;
-      _error = null;
-      notifyListeners();
       final success = await fetchProfile();
       _isAuthenticated = success;
-      _isLoading = false;
-      notifyListeners();
       if (!success) {
-        await apiService.clearToken();
+        await apiService.clearSession();
       }
+    } else {
+      _user = null;
+      _isAuthenticated = false;
     }
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  void _handleUnauthorized() {
+    _user = null;
+    _isAuthenticated = false;
+    _isLoading = false;
+    _error = 'Your session expired. Please log in again.';
+    notifyListeners();
   }
 
   Future<bool> login(String username, String password) async {
@@ -48,6 +82,9 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Login must be a clean public request. Clear stale tokens left by an
+      // expired web/mobile session before sending credentials.
+      await apiService.clearToken();
       final response = await apiService.post(
         AppConstants.loginEndpoint,
         data: {
@@ -266,7 +303,7 @@ class AuthProvider extends ChangeNotifier {
           await logout();
         }
       } else {
-        _error = 'Unable to fetch profile.';
+        _error = 'Unable to load your profile. Please try again.';
       }
     }
     notifyListeners();

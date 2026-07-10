@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
@@ -18,36 +19,51 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  final _usernameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _otpController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  String? _resetToken;
+  bool _otpSent = false;
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _phoneController.dispose();
+    _otpController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _requestReset() async {
-    final username = _usernameController.text.trim();
-    if (username.isEmpty) {
-      showErrorSnackbar(context, 'Enter your username.');
+  String _normalizedPhone() {
+    final raw = _phoneController.text.trim();
+    final digits = raw.replaceAll(RegExp(r'[^\d+]'), '');
+    if (digits.startsWith('+252')) return digits;
+    if (digits.startsWith('252')) return '+$digits';
+    if (digits.startsWith('0')) return '+252${digits.substring(1)}';
+    if (digits.startsWith('6')) return '+252$digits';
+    return digits;
+  }
+
+  Future<void> _requestResetOtp() async {
+    final phone = _normalizedPhone();
+    if (phone.isEmpty) {
+      showErrorSnackbar(context, 'Enter your phone number.');
       return;
     }
 
     setState(() => _isLoading = true);
     try {
-      final response = await context.read<ApiService>().post(
+      await context.read<ApiService>().post(
             AppConstants.forgotPasswordEndpoint,
-            data: {'username': username},
+            data: {'phone': phone},
           );
-      final data = response.data as Map<String, dynamic>? ?? {};
-      setState(() => _resetToken = data['reset_token']?.toString());
-      showSuccessSnackbar(context, 'Reset token generated.');
+      if (!mounted) return;
+      setState(() {
+        _otpSent = true;
+        _phoneController.text = phone;
+      });
+      showSuccessSnackbar(context, 'A reset code was sent to your phone.');
     } catch (error) {
       showErrorSnackbar(
         context,
@@ -59,11 +75,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _resetPassword() async {
-    final token = _resetToken;
+    final phone = _normalizedPhone();
+    final otp = _otpController.text.trim();
     final password = _passwordController.text;
 
-    if (token == null || token.isEmpty) {
-      showErrorSnackbar(context, 'Request a reset token first.');
+    if (otp.length != 6) {
+      showErrorSnackbar(context, 'Enter the 6-digit OTP code.');
       return;
     }
     if (!_isStrongPassword(password)) {
@@ -80,7 +97,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       await context.read<ApiService>().post(
             AppConstants.resetPasswordEndpoint,
             data: {
-              'token': token,
+              'phone': phone,
+              'otp_code': otp,
               'password': password,
             },
           );
@@ -107,8 +125,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasToken = _resetToken != null && _resetToken!.isNotEmpty;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(AppStrings.forgotPassword),
@@ -132,7 +148,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.lock_reset,
+                    Icons.sms_outlined,
                     color: AppColors.lightPrimary,
                     size: 44,
                   ),
@@ -140,31 +156,41 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
               const SizedBox(height: 28),
               Text(
-                hasToken ? 'Create a new password' : 'Reset your password',
+                _otpSent ? 'Enter your reset code' : 'Reset your password',
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 8),
               Text(
-                hasToken
-                    ? 'Enter a secure new password for your account.'
-                    : 'Enter your username to generate a password reset token.',
+                _otpSent
+                    ? 'Enter the OTP sent to your phone and choose a new password.'
+                    : 'Enter your registered phone number to receive a reset OTP.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 28),
-              if (!hasToken) ...[
+              CustomTextField(
+                label: 'Phone number',
+                hintText: '+25261XXXXXXX',
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                prefixIcon: const Icon(Icons.phone_outlined),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[\d+]')),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (_otpSent) ...[
                 CustomTextField(
-                  label: AppStrings.username,
-                  hintText: AppStrings.username,
-                  controller: _usernameController,
-                  prefixIcon: const Icon(Icons.person_outline),
+                  label: 'OTP code',
+                  hintText: '6-digit code',
+                  controller: _otpController,
+                  keyboardType: TextInputType.number,
+                  prefixIcon: const Icon(Icons.verified_outlined),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                GradientButton(
-                  label: _isLoading ? AppStrings.pleaseWait : 'Request reset',
-                  onPressed: _requestReset,
-                  isLoading: _isLoading,
-                ),
-              ] else ...[
+                const SizedBox(height: 16),
                 CustomTextField(
                   label: AppStrings.password,
                   hintText: AppStrings.password,
@@ -184,6 +210,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 GradientButton(
                   label: _isLoading ? AppStrings.pleaseWait : 'Update password',
                   onPressed: _resetPassword,
+                  isLoading: _isLoading,
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: _isLoading ? null : _requestResetOtp,
+                  child: const Text('Resend OTP'),
+                ),
+              ] else ...[
+                const SizedBox(height: 8),
+                GradientButton(
+                  label: _isLoading ? AppStrings.pleaseWait : 'Send OTP',
+                  onPressed: _requestResetOtp,
                   isLoading: _isLoading,
                 ),
               ],

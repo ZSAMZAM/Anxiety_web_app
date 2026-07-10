@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import 'safe_image.dart';
 
 class CustomCard extends StatelessWidget {
   final Widget child;
@@ -14,8 +15,8 @@ class CustomCard extends StatelessWidget {
   const CustomCard({
     Key? key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
-    this.borderRadius = 20,
+    this.padding = const EdgeInsets.all(11),
+    this.borderRadius = 18,
     this.backgroundColor,
     this.onTap,
     this.border,
@@ -29,23 +30,45 @@ class CustomCard extends StatelessWidget {
     final effectiveMargin = marginBottom == null
         ? margin
         : (margin ?? EdgeInsets.zero).add(marginBottom!);
+    final cardColor = backgroundColor ??
+        (isDark
+            ? AppColors.darkSecondaryCard.withOpacity(0.86)
+            : AppColors.lightCard.withOpacity(0.94));
 
     return Container(
       margin: effectiveMargin,
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
           decoration: BoxDecoration(
-            color: backgroundColor ?? (isDark ? AppColors.darkCard : AppColors.lightCard),
+            color: cardColor,
             borderRadius: BorderRadius.circular(borderRadius),
-            border: border ?? Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+            border: border ?? Border.all(color: isDark ? AppColors.darkBorder.withOpacity(0.78) : AppColors.lightBorder),
+            gradient: backgroundColor == null
+                ? LinearGradient(
+                    colors: isDark
+                        ? [AppColors.darkSecondaryCard.withOpacity(0.92), AppColors.darkCard.withOpacity(0.82)]
+                        : [Colors.white.withOpacity(0.98), AppColors.lightSoftBlue.withOpacity(0.42)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
             boxShadow: [
               BoxShadow(
-                color: isDark ? Colors.black.withOpacity(0.24) : const Color(0xFF235268).withOpacity(0.08),
-                blurRadius: 26,
-                spreadRadius: -10,
-                offset: const Offset(0, 16),
+                color: isDark ? Colors.black.withOpacity(0.28) : const Color(0xFF0F8EA8).withOpacity(0.10),
+                blurRadius: 22,
+                spreadRadius: -12,
+                offset: const Offset(0, 10),
               ),
+              if (!isDark)
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.85),
+                  blurRadius: 0,
+                  spreadRadius: 0,
+                  offset: const Offset(0, -1),
+                ),
             ],
           ),
           child: Padding(
@@ -69,8 +92,8 @@ class GradientCard extends StatelessWidget {
     Key? key,
     required this.child,
     required this.colors,
-    this.padding = const EdgeInsets.all(16),
-    this.borderRadius = 20,
+    this.padding = const EdgeInsets.all(12),
+    this.borderRadius = 18,
     this.onTap,
   }) : super(key: key);
 
@@ -88,10 +111,10 @@ class GradientCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(borderRadius),
           boxShadow: [
             BoxShadow(
-              color: colors[0].withOpacity(0.24),
-              blurRadius: 28,
-              spreadRadius: -8,
-              offset: const Offset(0, 16),
+              color: colors.last.withOpacity(0.28),
+              blurRadius: 22,
+              spreadRadius: -10,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
@@ -133,30 +156,29 @@ class DoctorCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return CustomCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(16),
-      borderRadius: 26,
+      padding: const EdgeInsets.all(11),
+      borderRadius: 18,
       child: Row(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             child: Container(
-              width: 80,
-              height: 80,
+              width: 58,
+              height: 58,
               decoration: BoxDecoration(
                 color: isDark ? AppColors.darkSecondaryCard : AppColors.lightSoftBlue,
               ),
-              child: imageUrl != null
-                  ? Image.network(
-                      imageUrl!,
-                      fit: BoxFit.cover,
-                    )
-                  : Icon(
-                      Icons.person,
-                      color: isDark ? AppColors.darkText : AppColors.lightText,
-                    ),
+              child: SafeImage(
+                url: imageUrl,
+                fit: BoxFit.cover,
+                fallback: Icon(
+                  Icons.person,
+                  color: isDark ? AppColors.darkText : AppColors.lightText,
+                ),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,16 +205,16 @@ class DoctorCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Wrap(
                   spacing: 8,
-                  runSpacing: 8,
+                  runSpacing: 6,
                   children: [
                     _MiniPill(icon: Icons.star_rounded, label: rating.toStringAsFixed(1), color: AppColors.lightWarning),
                     _MiniPill(icon: Icons.work_history_rounded, label: hospital.isEmpty ? 'Clinic' : hospital, color: AppColors.lightPrimary),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -229,7 +251,7 @@ class _MiniPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: color.withOpacity(0.11),
         borderRadius: BorderRadius.circular(999),

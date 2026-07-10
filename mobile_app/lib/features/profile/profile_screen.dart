@@ -6,6 +6,7 @@ import '../../core/constants/app_strings.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/cards.dart';
 import '../../core/widgets/dialogs.dart';
+import '../../core/widgets/safe_image.dart';
 import '../../core/widgets/text_fields.dart';
 import '../../core/providers/auth_provider.dart';
 
@@ -167,6 +168,16 @@ class _ProfileScreenState
                   .appointmentHistory,
               onPressed: () {
                 context.push('/appointment_history');
+              },
+            ),
+            const SizedBox(
+              height: 12,
+            ),
+            _ActionButton(
+              icon: Icons.receipt_long,
+              label: 'Refunds',
+              onPressed: () {
+                context.push('/refunds');
               },
             ),
             const SizedBox(
@@ -481,13 +492,16 @@ class _ProfileAvatar extends StatelessWidget {
         border: Border.all(color: Colors.white.withOpacity(0.45), width: 4),
       ),
       clipBehavior: Clip.antiAlias,
-      child: url != null && url!.trim().isNotEmpty
-          ? Image.network(
-              url!,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Center(child: Text(initials, style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900))),
-            )
-          : Center(child: Text(initials, style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900))),
+      child: SafeImage(
+        url: url,
+        fit: BoxFit.cover,
+        fallback: Center(
+          child: Text(
+            initials,
+            style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900),
+          ),
+        ),
+      ),
     );
   }
 }

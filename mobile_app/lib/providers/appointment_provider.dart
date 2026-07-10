@@ -67,6 +67,17 @@ class AppointmentProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final trimmedComment = comment.trim();
+    if (trimmedComment.isNotEmpty && trimmedComment.length < 5) {
+      _error = 'Feedback must be at least 5 characters.';
+      notifyListeners();
+      return false;
+    }
+    if (trimmedComment.length > 500) {
+      _error = 'Feedback must be 500 characters or less.';
+      notifyListeners();
+      return false;
+    }
 
     _isLoading = true;
     _error = null;
@@ -74,10 +85,11 @@ class AppointmentProvider extends ChangeNotifier {
 
     try {
       final response = await apiService.post(
-        '${AppConstants.appointmentHistoryEndpoint}/$appointmentId/rating',
+        '/api/reviews',
         data: {
+          'appointment_id': appointmentId,
           'rating': rating,
-          'comment': comment.trim(),
+          'feedback': trimmedComment,
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -92,6 +104,37 @@ class AppointmentProvider extends ChangeNotifier {
       } else {
         _error = 'Unable to submit rating.';
       }
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+
+  Future<bool> cancelAppointment(String appointmentId) async {
+    if (appointmentId.isEmpty) {
+      _error = 'Appointment is missing.';
+      notifyListeners();
+      return false;
+    }
+
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await apiService.put(
+        '${AppConstants.appointmentHistoryEndpoint}/$appointmentId',
+        data: {'status': 'Cancelled'},
+      );
+      if (response.statusCode == 200) {
+        await loadAppointments();
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+    } catch (error) {
+      _error = error is ApiException ? error.message : 'Unable to cancel appointment.';
     }
 
     _isLoading = false;

@@ -15,33 +15,44 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.isLoading = false,
     this.colors = AppColors.primaryGradient,
-    this.borderRadius = 20,
-    this.height = 56,
+    this.borderRadius = 14,
+    this.height = 46,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return Container(
       height: height,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: colors.last.withOpacity(0.30),
+            blurRadius: 18,
+            spreadRadius: -9,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(borderRadius),
-          ),
-          backgroundColor: colors.first,
-          shadowColor: colors.last.withOpacity(0.25),
-          elevation: 8,
-        ).copyWith(
-          backgroundColor: MaterialStateProperty.resolveWith((states) {
-            return colors.first;
-          }),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(borderRadius)),
+          backgroundColor: Colors.transparent,
+          disabledBackgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          elevation: 0,
         ),
         child: isLoading
             ? const SizedBox(
-                height: 24,
-                width: 24,
+                height: 20,
+                width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   color: Colors.white,
@@ -51,8 +62,8 @@ class AppButton extends StatelessWidget {
                 label,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
       ),

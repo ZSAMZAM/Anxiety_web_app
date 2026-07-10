@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/providers/assessment_provider.dart';
+import '../../core/providers/dashboard_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/cards.dart';
 import '../../core/widgets/dialogs.dart';
+import '../../providers/prediction_provider.dart';
 
 class AssessmentScreen extends StatefulWidget {
   const AssessmentScreen({Key? key}) : super(key: key);
@@ -32,7 +35,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
 
     final text = _textController.text.trim();
     if (text.length < 20) {
-      showErrorSnackbar(context, 'Please enter at least 20 meaningful characters.');
+      showErrorSnackbar(context, context.tr('minimumAssessmentText'));
       return;
     }
 
@@ -40,9 +43,17 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     final success = await provider.submitAssessment(prompt);
     if (!mounted) return;
     if (success) {
+      await context.read<PredictionProvider>().loadHistory();
+      if (mounted) {
+        await context.read<DashboardProvider>().loadDashboard(silent: true);
+      }
+      if (!mounted) return;
       context.push('/prediction_result');
     } else {
       showErrorSnackbar(context, provider.error ?? AppStrings.errorOccurred);
+      if (provider.requiresLogin) {
+        context.go('/login');
+      }
     }
   }
 
@@ -58,7 +69,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
   Widget build(BuildContext context) {
     final progress = _step == 0 ? 0.45 : (_textController.text.trim().length / 120).clamp(0.55, 1.0);
     return Scaffold(
-      appBar: AppBar(title: Text(AppStrings.assessment)),
+      appBar: AppBar(title: Text(context.tr('assessment'))),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
@@ -87,7 +98,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               builder: (context, provider, _) {
                 final disabled = _step == 1 && _textController.text.trim().length < 20;
                 return GradientButton(
-                  label: _step == 0 ? 'Continue' : AppStrings.analyze,
+                  label: _step == 0 ? context.tr('continue') : context.tr('analyze'),
                   onPressed: disabled ? () {} : _next,
                   isLoading: provider.isLoading,
                   colors: disabled ? [AppColors.lightGrey, AppColors.lightGrey] : AppColors.primaryGradient,
@@ -98,7 +109,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               const SizedBox(height: 12),
               TextButton(
                 onPressed: () => setState(() => _step = 0),
-                child: const Text('Back to mood selection'),
+                child: Text(context.tr('backToMood')),
               ),
             ],
             const SizedBox(height: 20),

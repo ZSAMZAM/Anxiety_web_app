@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/network/api_client.dart';
 import '../../core/providers/doctor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/cards.dart';
+import '../../core/widgets/safe_image.dart';
 
 class DoctorListScreen extends StatefulWidget {
   const DoctorListScreen({Key? key}) : super(key: key);
@@ -13,23 +18,70 @@ class DoctorListScreen extends StatefulWidget {
   State<DoctorListScreen> createState() => _DoctorListScreenState();
 }
 
-class _DoctorListScreenState extends State<DoctorListScreen> {
+class _DoctorListScreenState extends State<DoctorListScreen> with WidgetsBindingObserver {
   final _searchController = TextEditingController();
   final Set<String> _favorites = {};
-  String _sortBy = 'rating';
+  String _sortBy = 'newest';
+  Timer? _refreshTimer;
+  bool _assessmentChecked = false;
+  bool _canBookTherapist = false;
+  bool _hasAssessment = false;
+  String _assessmentMessage = 'Complete your mental health assessment before booking a therapist.';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DoctorProvider>().loadDoctors();
+      _loadEligibilityAndDoctors();
+    });
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted && _canBookTherapist) {
+        context.read<DoctorProvider>().loadDoctors(silent: true);
+      }
     });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _loadEligibilityAndDoctors(silent: true);
+    }
+  }
+
+  Future<void> _loadEligibilityAndDoctors({bool silent = false}) async {
+    try {
+      final response = await context.read<ApiService>().get(AppConstants.historyEndpoint);
+      final data = response.data as Map<String, dynamic>? ?? {};
+      final canBook = data['can_book_therapist'] == true;
+      if (!mounted) return;
+      setState(() {
+        _assessmentChecked = true;
+        _canBookTherapist = canBook;
+        _hasAssessment = data['has_assessment'] == true || ((data['history'] as List<dynamic>? ?? []).isNotEmpty);
+        _assessmentMessage = data['booking_message']?.toString() ??
+            'Complete your mental health assessment before booking a therapist.';
+      });
+      if (canBook) {
+        await context.read<DoctorProvider>().loadDoctors(silent: silent);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _assessmentChecked = true;
+        _canBookTherapist = false;
+        _hasAssessment = false;
+        _assessmentMessage = 'Complete your mental health assessment before booking a therapist.';
+      });
+    }
   }
 
   @override
@@ -38,15 +90,55 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
       appBar: AppBar(title: Text(AppStrings.doctors)),
       body: Consumer<DoctorProvider>(
         builder: (context, provider, _) {
+          if (!_assessmentChecked) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!_canBookTherapist) {
+            return ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                CustomCard(
+                  borderRadius: 24,
+                  padding: const EdgeInsets.all(18),
+                  backgroundColor: AppColors.lightWarning.withOpacity(0.10),
+                  border: Border.all(color: AppColors.lightWarning.withOpacity(0.28)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.psychology_rounded, color: AppColors.lightWarning),
+                      const SizedBox(height: 12),
+                      Text(
+                        _assessmentMessage,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: () => _hasAssessment
+                            ? context.go('/prediction_history')
+                            : context.go('/assessment'),
+                        icon: Icon(_hasAssessment ? Icons.timeline_rounded : Icons.psychology_rounded),
+                        label: Text(_hasAssessment ? 'View History' : 'Start Assessment'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
           final doctors = [...provider.filteredDoctors];
           doctors.sort((a, b) {
+            if (_sortBy == 'newest') {
+              final aCreated = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+              final bCreated = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+              return bCreated.compareTo(aCreated);
+            }
             if (_sortBy == 'fee') return a.fee.compareTo(b.fee);
             if (_sortBy == 'experience') return b.experience.compareTo(a.experience);
             return b.rating.compareTo(a.rating);
           });
 
           return RefreshIndicator(
-            onRefresh: provider.loadDoctors,
+            onRefresh: _loadEligibilityAndDoctors,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
               children: [
@@ -183,6 +275,7 @@ class _FilterBar extends StatelessWidget {
             Wrap(
               spacing: 6,
               children: [
+                _SortChip(label: 'Newest', value: 'newest', selected: sortBy == 'newest', onTap: onSortChanged),
                 _SortChip(label: 'Rating', value: 'rating', selected: sortBy == 'rating', onTap: onSortChanged),
                 _SortChip(label: 'Fee', value: 'fee', selected: sortBy == 'fee', onTap: onSortChanged),
                 _SortChip(label: 'Exp', value: 'experience', selected: sortBy == 'experience', onTap: onSortChanged),
@@ -233,6 +326,16 @@ class _PremiumDoctorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final active = doctor.status.trim().toUpperCase() == 'ACTIVE';
+    final hasAvailability = doctor.hasUpcomingAvailability;
+    final availabilityLabel = !active
+        ? 'Inactive'
+        : hasAvailability
+            ? 'Slots open'
+            : 'No slots';
+    final availabilityColor = active && hasAvailability
+        ? AppColors.lightSuccess
+        : AppColors.lightWarning;
     return CustomCard(
       onTap: onTap,
       padding: const EdgeInsets.all(16),
@@ -246,9 +349,11 @@ class _PremiumDoctorCard extends StatelessWidget {
               width: 82,
               height: 92,
               color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-              child: doctor.photo != null && doctor.photo!.isNotEmpty
-                  ? Image.network(doctor.photo!, fit: BoxFit.cover)
-                  : Icon(Icons.person_rounded, size: 38, color: Theme.of(context).colorScheme.primary),
+              child: SafeImage(
+                url: doctor.photo,
+                fit: BoxFit.cover,
+                fallback: Icon(Icons.person_rounded, size: 38, color: Theme.of(context).colorScheme.primary),
+              ),
             ),
           ),
           const SizedBox(width: 14),
@@ -274,9 +379,15 @@ class _PremiumDoctorCard extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _Pill(icon: Icons.star_rounded, label: doctor.rating.toStringAsFixed(1), color: AppColors.lightWarning),
+                    _Pill(
+                      icon: Icons.star_rounded,
+                      label: doctor.reviewCount > 0
+                          ? '${doctor.rating.toStringAsFixed(1)} (${doctor.reviewCount} Reviews)'
+                          : 'No reviews',
+                      color: AppColors.lightWarning,
+                    ),
                     _Pill(icon: Icons.work_rounded, label: '${doctor.experience} yrs', color: AppColors.lightPrimary),
-                    _Pill(icon: Icons.schedule_rounded, label: 'Available', color: AppColors.lightSuccess),
+                    _Pill(icon: Icons.schedule_rounded, label: availabilityLabel, color: availabilityColor),
                   ],
                 ),
                 const SizedBox(height: 12),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -28,6 +30,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String? _selectedGender;
   DateTime? _selectedDateOfBirth;
+  Timer? _phoneAvailabilityDebounce;
+  bool _isCheckingPhoneAvailability = false;
+  bool? _isPhoneAvailable;
+  String? _phoneAvailabilityMessage;
+  String? _lastCheckedPhone;
   final genders = [
     AppStrings.male,
     AppStrings.female,
@@ -44,6 +51,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
+    _phoneAvailabilityDebounce?.cancel();
     _fullNameController.dispose();
     _usernameController.dispose();
     _phoneController.dispose();
@@ -67,6 +75,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final fullName = _fullNameController.text.trim();
       final username = _usernameController.text.trim();
       final phone = _phoneController.text.trim();
+      final isAvailable = await _checkPhoneAvailability(phone);
+      if (!isAvailable) {
+        if (mounted) {
+          showErrorSnackbar(
+            context,
+            _phoneAvailabilityMessage ?? 'Registration cannot continue.',
+          );
+        }
+        return;
+      }
       final age = int.parse(_ageController.text.trim());
       final password = _passwordController.text;
       final success = await authProvider.register(
@@ -81,15 +99,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (mounted) {
         if (success) {
-          final otpSent = await authProvider.sendOtp(phone);
-          if (!mounted) return;
-          if (!otpSent) {
-            showErrorSnackbar(
-              context,
-              authProvider.error ?? 'Account created, but the verification code could not be sent.',
-            );
-            return;
-          }
           showSuccessSnackbar(
             context,
             'Account created. Verify your phone number to continue.',
@@ -103,6 +112,72 @@ class _RegisterScreenState extends State<RegisterScreen> {
         }
       }
     }
+  }
+
+  String? _validatePhoneFormat(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) {
+      return AppStrings.requiredField;
+    }
+    final phonePattern = RegExp(r'^\+252(61|62|63|65|66|67|68|69|77|90)\d{7}$');
+    if (!phonePattern.hasMatch(text)) {
+      return 'Use a valid Somali phone number, e.g. +25261XXXXXXX';
+    }
+    return null;
+  }
+
+  void _onPhoneChanged(String value) {
+    _phoneAvailabilityDebounce?.cancel();
+    final phone = value.trim();
+    setState(() {
+      _isPhoneAvailable = null;
+      _lastCheckedPhone = null;
+      _phoneAvailabilityMessage = null;
+      _isCheckingPhoneAvailability = false;
+    });
+
+    if (_validatePhoneFormat(phone) != null) return;
+
+    _phoneAvailabilityDebounce = Timer(const Duration(milliseconds: 650), () {
+      _checkPhoneAvailability(phone);
+    });
+  }
+
+  Future<bool> _checkPhoneAvailability(String phone) async {
+    if (_validatePhoneFormat(phone) != null) {
+      setState(() {
+        _isPhoneAvailable = false;
+        _phoneAvailabilityMessage =
+            'Use a valid Somali phone number, e.g. +25261XXXXXXX';
+        _lastCheckedPhone = phone;
+      });
+      return false;
+    }
+
+    if (_lastCheckedPhone == phone && _isPhoneAvailable == true) {
+      return true;
+    }
+
+    setState(() {
+      _isCheckingPhoneAvailability = true;
+      _phoneAvailabilityMessage = null;
+    });
+
+    final authProvider = context.read<AuthProvider>();
+    final available = await authProvider.isPhoneAvailable(phone);
+    if (!mounted) return false;
+
+    final message = available
+        ? 'Phone number available'
+        : authProvider.error ?? 'This phone number is already registered.';
+    setState(() {
+      _isCheckingPhoneAvailability = false;
+      _isPhoneAvailable = available;
+      _phoneAvailabilityMessage = message;
+      _lastCheckedPhone = phone;
+    });
+
+    return available;
   }
 
   @override
@@ -154,7 +229,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   label: AppStrings.username,
                   hintText: AppStrings.username,
                   controller: _usernameController,
-                  prefixIcon: Icon(Icons.alternate_email),
+                  prefixIcon: Icon(Icons.person_outline_rounded),
                   validator: (value) {
                     final text = value?.trim() ?? '';
                     if (text.isEmpty) {
@@ -173,18 +248,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   prefixIcon: Icon(Icons.phone),
-                  validator: (value) {
-                    final text = value?.trim() ?? '';
-                    if (text.isEmpty) {
-                      return AppStrings.requiredField;
-                    }
-                    final phonePattern = RegExp(r'^\+252(61|62|63|65|66|67|68|69|77|90)\d{7}$');
-                    if (!phonePattern.hasMatch(text)) {
-                      return 'Use a valid Somali phone number, e.g. +25261XXXXXXX';
-                    }
-                    return null;
-                  },
+                  errorText: _isPhoneAvailable == false &&
+                          _phoneAvailabilityMessage ==
+                              'This phone number is already registered.'
+                      ? _phoneAvailabilityMessage
+                      : null,
+                  onChanged: _onPhoneChanged,
+                  validator: _validatePhoneFormat,
                 ),
+                if (_isCheckingPhoneAvailability ||
+                    (_phoneAvailabilityMessage != null &&
+                        _isPhoneAvailable != false)) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      if (_isCheckingPhoneAvailability)
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        Icon(
+                          _isPhoneAvailable == true
+                              ? Icons.check_circle
+                              : Icons.error,
+                          size: 16,
+                          color: _isPhoneAvailable == true
+                              ? AppColors.lightSuccess
+                              : AppColors.lightDanger,
+                        ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          _isCheckingPhoneAvailability
+                              ? 'Checking phone number...'
+                              : _phoneAvailabilityMessage!,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: _isPhoneAvailable == true
+                                        ? AppColors.lightSuccess
+                                        : AppColors.lightDanger,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 20),
                 CustomDropdown<String>(
                   label: AppStrings.gender,

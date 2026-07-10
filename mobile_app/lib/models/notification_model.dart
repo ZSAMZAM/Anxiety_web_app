@@ -5,6 +5,7 @@ class NotificationModel {
   final String title;
   final String message;
   final String type;
+  final String? referenceId;
   final String status;
   final String? createdAt;
 
@@ -15,6 +16,7 @@ class NotificationModel {
     required this.title,
     required this.message,
     required this.type,
+    this.referenceId,
     required this.status,
     this.createdAt,
   });
@@ -27,6 +29,7 @@ class NotificationModel {
       title: json['title']?.toString() ?? 'Notification',
       message: json['message']?.toString() ?? '',
       type: json['type']?.toString() ?? json['notification_type']?.toString() ?? 'general',
+      referenceId: json['reference_id']?.toString(),
       status: json['status']?.toString() ??
           (json['is_read'] == true || json['is_read'] == 1 ? 'Read' : 'Unread'),
       createdAt: json['created_at']?.toString() ?? json['date']?.toString(),

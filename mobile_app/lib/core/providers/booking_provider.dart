@@ -4,6 +4,8 @@ import '../network/api_client.dart';
 import '../network/api_exception.dart';
 import '../network/models.dart';
 
+// Tracks the selected doctor session and creates appointments through the
+// backend, which then notifies doctors and admins from database records.
 class BookingProvider extends ChangeNotifier {
   final ApiService apiService;
 
@@ -49,7 +51,7 @@ class BookingProvider extends ChangeNotifier {
   }
 
   // Confirm booking
-  Future<bool> confirmBooking(String doctorId, {required String doctorName, required String phone}) async {
+  Future<bool> confirmBooking(String doctorId, {required String doctorName}) async {
     if (_selectedDate == null || _selectedTime == null) {
       _error = 'Please select date and time';
       notifyListeners();
@@ -66,7 +68,6 @@ class BookingProvider extends ChangeNotifier {
         data: {
           'doctor_id': doctorId,
           'doctor_name': doctorName,
-          'phone': phone,
           'appointment_date': _selectedDate!.toIso8601String().split('T').first,
           'appointment_time': _normalizeTimeForApi(_selectedTime!),
           'notes': _notes ?? '',

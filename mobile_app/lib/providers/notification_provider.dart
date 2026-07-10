@@ -4,6 +4,8 @@ import '../core/network/api_exception.dart';
 import '../models/notification_model.dart';
 import '../core/constants/app_constants.dart';
 
+// Reads patient notifications from the backend notifications table and updates
+// read/unread state through API calls.
 class NotificationProvider extends ChangeNotifier {
   final ApiService apiService;
 
@@ -17,8 +19,8 @@ class NotificationProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  Future<bool> loadNotifications() async {
-    _isLoading = true;
+  Future<bool> loadNotifications({bool silent = false}) async {
+    if (!silent) _isLoading = true;
     _error = null;
     notifyListeners();
 
@@ -30,7 +32,7 @@ class NotificationProvider extends ChangeNotifier {
         _notifications = notifications
             .map((item) => NotificationModel.fromJson(item as Map<String, dynamic>))
             .toList();
-        _isLoading = false;
+        if (!silent) _isLoading = false;
         notifyListeners();
         return true;
       }
@@ -42,7 +44,7 @@ class NotificationProvider extends ChangeNotifier {
       }
     }
 
-    _isLoading = false;
+    if (!silent) _isLoading = false;
     notifyListeners();
     return false;
   }

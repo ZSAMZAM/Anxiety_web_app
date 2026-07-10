@@ -52,8 +52,8 @@ class DoctorProvider extends ChangeNotifier {
   String get specialtyFilter => _specialtyFilter;
 
   // Load doctors
-  Future<void> loadDoctors() async {
-    _isLoading = true;
+  Future<void> loadDoctors({bool silent = false}) async {
+    if (!silent) _isLoading = true;
     _error = null;
     notifyListeners();
 
@@ -75,7 +75,7 @@ class DoctorProvider extends ChangeNotifier {
       }
     }
 
-    _isLoading = false;
+    if (!silent) _isLoading = false;
     notifyListeners();
   }
 

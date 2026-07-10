@@ -23,6 +23,10 @@ class DashboardProvider extends ChangeNotifier {
   int _doctorsAvailable = 0;
   int _myAppointments = 0;
   int _paymentsMade = 0;
+  bool _hasAssessment = false;
+  bool _canBookTherapist = false;
+  bool _hasTreatmentPlan = false;
+  String? _bookingMessage;
   bool _isLoading = false;
   String? _error;
 
@@ -46,6 +50,28 @@ class DashboardProvider extends ChangeNotifier {
   int get doctorsAvailable => _doctorsAvailable;
   int get myAppointments => _myAppointments;
   int get paymentsMade => _paymentsMade;
+  bool get hasAssessment => _hasAssessment || _totalPredictions > 0 || _recentPredictions.isNotEmpty;
+  bool get canBookTherapist => _canBookTherapist;
+  bool get hasTreatmentPlan => _hasTreatmentPlan;
+  bool get hasAppointments => _myAppointments > 0 || _appointments.isNotEmpty;
+  String get bookingMessage => _bookingMessage ?? 'Complete your mental health assessment before booking a therapist.';
+  bool get latestResultIsHealthy {
+    final status = _latestPrediction?.status.toLowerCase() ?? '';
+    if (!_hasAssessment || status.isEmpty) return false;
+    if (status.contains('anxiety') ||
+        status.contains('depression') ||
+        status.contains('moderate') ||
+        status.contains('high risk') ||
+        status.contains('high-risk')) {
+      return false;
+    }
+    return status.contains('normal') ||
+        status.contains('healthy') ||
+        status.contains('neutral') ||
+        status.contains('low risk') ||
+        status.contains('low-risk') ||
+        status.contains('stable');
+  }
   int get therapySessions => _appointments.where((appointment) {
         final status = appointment.status.toLowerCase();
         return status.contains('confirmed') || status.contains('completed');
@@ -64,9 +90,12 @@ class DashboardProvider extends ChangeNotifier {
 
   int get latestConfidence => anxietyScore;
 
-  Future<void> loadDashboard() async {
-    _isLoading = true;
+  Future<void> loadDashboard({bool silent = false}) async {
+    if (!silent) _isLoading = true;
     _error = null;
+    _canBookTherapist = false;
+    _hasTreatmentPlan = false;
+    _bookingMessage = 'Complete your mental health assessment before booking a therapist.';
     notifyListeners();
 
     final loaders = [
@@ -75,6 +104,7 @@ class DashboardProvider extends ChangeNotifier {
       _loadAppointments,
       _loadDoctors,
       _loadNotifications,
+      _loadTreatmentPlanStatus,
     ];
     var successCount = 0;
     ApiException? apiError;
@@ -100,7 +130,7 @@ class DashboardProvider extends ChangeNotifier {
       _error = apiError?.message ?? 'Unable to load dashboard data.';
     }
 
-    _isLoading = false;
+    if (!silent) _isLoading = false;
     notifyListeners();
   }
 
@@ -122,6 +152,9 @@ class DashboardProvider extends ChangeNotifier {
 
     final data = response.data as Map<String, dynamic>? ?? {};
     final history = data['history'] as List<dynamic>? ?? [];
+    _hasAssessment = data['has_assessment'] == true || history.isNotEmpty || _totalPredictions > 0;
+    _canBookTherapist = data['can_book_therapist'] == true;
+    _bookingMessage = data['booking_message']?.toString();
     _recentPredictions.clear();
     _anxietyDetections = 0;
     _depressionDetections = 0;
@@ -163,6 +196,12 @@ class DashboardProvider extends ChangeNotifier {
   }
 
   Future<void> _loadDoctors() async {
+    if (!_canBookTherapist) {
+      _recommendedDoctors.clear();
+      _recommendedDoctor = null;
+      return;
+    }
+
     final response = await apiService.get(AppConstants.doctorsEndpoint);
     if (response.statusCode != 200) return;
 
@@ -205,6 +244,14 @@ class DashboardProvider extends ChangeNotifier {
     } else {
       _latestNotification = null;
     }
+  }
+
+  Future<void> _loadTreatmentPlanStatus() async {
+    final response = await apiService.get(AppConstants.latestTreatmentPlanEndpoint);
+    if (response.statusCode != 200) return;
+
+    final data = response.data as Map<String, dynamic>? ?? {};
+    _hasTreatmentPlan = data['treatment_plan'] is Map<String, dynamic>;
   }
 
   Future<void> _loadRecommendations() async {

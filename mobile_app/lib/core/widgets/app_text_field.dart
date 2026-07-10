@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
 
 class AppTextField extends StatelessWidget {
   final String label;
@@ -34,9 +33,7 @@ class AppTextField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(context).textTheme.labelLarge,
         ),
         const SizedBox(height: 8),
         TextFormField(

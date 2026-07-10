@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +8,7 @@ import '../../core/network/models.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/dashboard_provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/safe_image.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -14,15 +17,36 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DashboardProvider>().loadDashboard();
     });
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) {
+        context.read<DashboardProvider>().loadDashboard(silent: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<DashboardProvider>().loadDashboard(silent: true);
+    }
   }
 
   Future<void> _refresh() {
@@ -52,17 +76,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final dashboard = context.watch<DashboardProvider>();
     final user = context.watch<AuthProvider>().user;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      body: SafeArea(
-        child: dashboard.isLoading
-            ? const _DashboardSkeleton()
-            : RefreshIndicator(
-                onRefresh: _refresh,
-                child: LayoutBuilder(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDark
+                ? AppColors.darkCalmGradient
+                : AppColors.calmGradient,
+          ),
+        ),
+        child: SafeArea(
+          child: dashboard.isLoading
+              ? const _DashboardSkeleton()
+              : RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: LayoutBuilder(
                   builder: (context, constraints) {
                     final maxWidth = constraints.maxWidth >= 900 ? 1040.0 : double.infinity;
                     return ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                       children: [
                         Center(
                           child: ConstrainedBox(
@@ -75,25 +111,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   avatarUrl: user?.avatar,
                                   unreadCount: dashboard.unreadNotifications,
                                 ),
-                                const SizedBox(height: 18),
+                                const SizedBox(height: 10),
                                 if (dashboard.error != null) ...[
                                   _FriendlyErrorCard(onRetry: _refresh),
-                                  const SizedBox(height: 18),
+                                  const SizedBox(height: 10),
                                 ],
                                 _MentalHealthStatusCard(provider: dashboard),
-                                const SizedBox(height: 18),
+                                const SizedBox(height: 10),
                                 _StatsGrid(provider: dashboard),
-                                const SizedBox(height: 22),
-                                const _QuickActions(),
-                                const SizedBox(height: 22),
+                                const SizedBox(height: 12),
+                                _QuickActions(provider: dashboard),
+                                const SizedBox(height: 12),
                                 _UpcomingAppointmentCard(provider: dashboard),
-                                const SizedBox(height: 22),
+                                const SizedBox(height: 12),
                                 _RecommendedTherapists(provider: dashboard),
-                                const SizedBox(height: 22),
+                                const SizedBox(height: 12),
                                 _WellnessTips(provider: dashboard),
-                                const SizedBox(height: 22),
+                                const SizedBox(height: 12),
                                 _RecentPredictionHistory(provider: dashboard),
-                                const SizedBox(height: 22),
+                                const SizedBox(height: 12),
                                 _NotificationsPreview(provider: dashboard),
                               ],
                             ),
@@ -102,20 +138,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ],
                     );
                   },
+                  ),
                 ),
-              ),
+        ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: _openTab,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.psychology_rounded), label: 'Assess'),
-          BottomNavigationBarItem(icon: Icon(Icons.event_rounded), label: 'Bookings'),
-          BottomNavigationBarItem(icon: Icon(Icons.notifications_rounded), label: 'Alerts'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
-        ],
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard.withOpacity(0.96) : Colors.white.withOpacity(0.96),
+              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.30 : 0.10),
+                  blurRadius: 24,
+                  spreadRadius: -12,
+                  offset: const Offset(0, -8),
+                ),
+              ],
+            ),
+            child: BottomNavigationBar(
+              currentIndex: _currentIndex,
+              onTap: _openTab,
+              type: BottomNavigationBarType.fixed,
+              iconSize: 22,
+              items: const [
+                BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
+                BottomNavigationBarItem(icon: Icon(Icons.psychology_rounded), label: 'Assess'),
+                BottomNavigationBarItem(icon: Icon(Icons.event_rounded), label: 'Bookings'),
+                BottomNavigationBarItem(icon: Icon(Icons.notifications_rounded), label: 'Alerts'),
+                BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -137,19 +195,19 @@ class _DashboardHeader extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
-        _Avatar(url: avatarUrl, name: name, size: 58),
-        const SizedBox(width: 14),
+        _Avatar(url: avatarUrl, name: name, size: 48),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${_greeting()}, $name',
+                'Hello, $name',
                 style: Theme.of(context).textTheme.headlineMedium,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 5),
+              const SizedBox(height: 3),
               Text(
                 _formattedToday(),
                 style: Theme.of(context).textTheme.bodyMedium,
@@ -190,7 +248,7 @@ class _DashboardHeader extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         _IconButtonSurface(
           icon: Icons.person_rounded,
           onTap: () => context.push('/profile'),
@@ -210,23 +268,21 @@ class _MentalHealthStatusCard extends StatelessWidget {
     final prediction = provider.latestPrediction;
     final status = _statusLabel(prediction?.status);
     final statusColor = _statusColor(status);
-    final gradient = _statusGradient(status);
     final confidence = provider.latestConfidence.clamp(0, 100);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradient,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(30),
+        color: isDark ? AppColors.darkCard.withOpacity(0.94) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
         boxShadow: [
           BoxShadow(
-            color: gradient.first.withOpacity(0.26),
-            blurRadius: 28,
-            offset: const Offset(0, 16),
+            color: Colors.black.withOpacity(isDark ? 0.22 : 0.06),
+            blurRadius: 20,
+            spreadRadius: -8,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -236,40 +292,46 @@ class _MentalHealthStatusCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
-                  borderRadius: BorderRadius.circular(16),
+                  color: AppColors.lightPrimary.withOpacity(isDark ? 0.16 : 0.10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.favorite_rounded, color: Colors.white),
+                child: Icon(Icons.health_and_safety_rounded, color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary, size: 20),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Mental Health Status',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
+                      ),
                 ),
               ),
-              _Pill(label: _riskLevel(status), color: Colors.white, textColor: statusColor),
+              _Pill(label: _riskLevel(status), color: statusColor.withOpacity(0.12), textColor: statusColor),
             ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 12),
           Text(
             status,
-            style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
+            style: Theme.of(context).textTheme.headlineMedium,
           ),
-          const SizedBox(height: 8),
-          Text(
-            prediction == null
-                ? 'Take an assessment to receive your first analysis.'
-                : 'Analyzed on ${_formatDate(prediction.date)}',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white.withOpacity(0.88)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Text(
+                'Confidence $confidence%',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const Spacer(),
+              Text(
+                prediction == null ? 'Not assessed' : _formatDate(prediction.date),
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
@@ -277,34 +339,35 @@ class _MentalHealthStatusCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                   child: LinearProgressIndicator(
                     value: confidence / 100,
-                    minHeight: 10,
-                    backgroundColor: Colors.white.withOpacity(0.22),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                    minHeight: 5,
+                    backgroundColor: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                    valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               Text(
                 '$confidence%',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
+                style: Theme.of(context).textTheme.labelLarge,
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           Wrap(
-            spacing: 10,
-            runSpacing: 10,
+            spacing: 8,
+            runSpacing: 8,
             children: [
               _GradientCardButton(
-                label: 'Take New Assessment',
+                label: 'New Assessment',
                 icon: Icons.psychology_rounded,
                 onTap: () => context.push('/assessment'),
               ),
-              _GradientCardButton(
-                label: 'View History',
-                icon: Icons.timeline_rounded,
-                onTap: () => context.push('/prediction_history'),
-              ),
+              if (provider.hasAssessment)
+                _GradientCardButton(
+                  label: 'View History',
+                  icon: Icons.timeline_rounded,
+                  onTap: () => context.push('/prediction_history'),
+                ),
             ],
           ),
         ],
@@ -328,16 +391,16 @@ class _StatsGrid extends StatelessWidget {
     ];
 
     return _ResponsiveGrid(
-      minTileWidth: 160,
-      spacing: 12,
+      minTileWidth: 148,
+      spacing: 10,
       children: stats
           .map(
             (stat) => _PremiumSurface(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(11),
               child: Row(
                 children: [
                   _TintedIcon(icon: stat.icon, color: stat.color),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 9),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -366,16 +429,24 @@ class _StatsGrid extends StatelessWidget {
 }
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions();
+  final DashboardProvider provider;
+
+  const _QuickActions({required this.provider});
 
   @override
   Widget build(BuildContext context) {
     final actions = [
       _ActionData('Start Assessment', Icons.psychology_rounded, AppColors.lightPrimary, () => context.push('/assessment')),
-      _ActionData('Book Therapist', Icons.medical_services_rounded, AppColors.lightAccent, () => context.push('/doctors')),
-      _ActionData('My Appointments', Icons.event_note_rounded, AppColors.lightSuccess, () => context.push('/appointment_history')),
-      _ActionData('Recommendations', Icons.spa_rounded, AppColors.lightSecondary, () => context.push('/recommendations')),
-      _ActionData('Prediction History', Icons.timeline_rounded, AppColors.lightWarning, () => context.push('/prediction_history')),
+      if (provider.hasTreatmentPlan)
+        _ActionData('Treatment Plan', Icons.assignment_turned_in_rounded, AppColors.lightSuccess, () => context.push('/treatment_plan'))
+      else if (provider.canBookTherapist)
+        _ActionData('Book Therapist', Icons.medical_services_rounded, AppColors.lightAccent, () => context.push('/doctors')),
+      if (provider.hasAppointments)
+        _ActionData('My Appointments', Icons.event_note_rounded, AppColors.lightSuccess, () => context.push('/appointment_history')),
+      if (provider.latestResultIsHealthy)
+        _ActionData('Recommendations', Icons.spa_rounded, AppColors.lightSecondary, () => context.push('/recommendations')),
+      if (provider.hasAssessment)
+        _ActionData('Prediction History', Icons.timeline_rounded, AppColors.lightWarning, () => context.push('/prediction_history')),
       _ActionData('Profile', Icons.person_rounded, AppColors.lightAccent, () => context.push('/profile')),
     ];
 
@@ -384,9 +455,21 @@ class _QuickActions extends StatelessWidget {
       children: [
         _SectionHeader(title: 'Quick Actions'),
         const SizedBox(height: 12),
+        if (!provider.hasAssessment) ...[
+          _PremiumSurface(
+            child: _EmptyState(
+              icon: Icons.psychology_rounded,
+              title: 'Complete your mental health assessment before booking a therapist.',
+              message: 'Start with an assessment so AnxietyCare can guide the next step.',
+              actionLabel: 'Start Assessment',
+              onAction: () => context.push('/assessment'),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         _ResponsiveGrid(
-          minTileWidth: 142,
-          spacing: 12,
+          minTileWidth: 128,
+          spacing: 10,
           children: actions
               .map(
                 (action) => _AnimatedActionCard(
@@ -423,9 +506,9 @@ class _UpcomingAppointmentCard extends StatelessWidget {
               ? _EmptyState(
                   icon: Icons.event_busy_rounded,
                   title: 'No upcoming appointments',
-                  message: 'Book a therapist when you are ready for professional support.',
-                  actionLabel: 'Book Therapist',
-                  onAction: () => context.push('/doctors'),
+                  message: 'Appointments will appear here after a professional-support assessment and booking.',
+                  actionLabel: 'View Assessment History',
+                  onAction: () => context.push('/prediction_history'),
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -496,6 +579,23 @@ class _RecommendedTherapists extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final doctors = provider.recommendedDoctors;
+    if (!provider.canBookTherapist) {
+      return _PremiumSurface(
+        child: _EmptyState(
+          icon: Icons.medical_services_rounded,
+          title: provider.hasAssessment
+              ? 'Therapist booking is not needed for your latest result'
+              : 'Complete your mental health assessment before booking a therapist.',
+          message: provider.hasAssessment
+              ? 'Healthy results keep you focused on recommendations and assessment history.'
+              : 'Start an assessment first, then booking opens only if professional support is recommended.',
+          actionLabel: provider.hasAssessment ? 'View History' : 'Start Assessment',
+          onAction: () => provider.hasAssessment
+              ? context.push('/prediction_history')
+              : context.push('/assessment'),
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -539,6 +639,25 @@ class _WellnessTips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tips = provider.recommendations;
+    if (!provider.latestResultIsHealthy) {
+      return _PremiumSurface(
+        child: _EmptyState(
+          icon: provider.canBookTherapist ? Icons.medical_information_rounded : Icons.spa_rounded,
+          title: provider.canBookTherapist
+              ? 'Professional support is recommended'
+              : 'Wellness recommendations appear after a healthy assessment',
+          message: provider.canBookTherapist
+              ? 'Book a therapist to continue with professional care.'
+              : 'Complete your mental health assessment before viewing recommendations.',
+          actionLabel: provider.hasTreatmentPlan ? 'View Treatment Plan' : provider.canBookTherapist ? 'Book Therapist' : 'Start Assessment',
+          onAction: () => provider.hasTreatmentPlan
+              ? context.push('/treatment_plan')
+              : provider.canBookTherapist
+              ? context.push('/doctors')
+              : context.push('/assessment'),
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -852,12 +971,12 @@ class _AnimatedActionCardState extends State<_AnimatedActionCard> {
         duration: const Duration(milliseconds: 130),
         scale: _pressed ? 0.97 : 1,
         child: _PremiumSurface(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(11),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _TintedIcon(icon: widget.icon, color: widget.color),
-              const SizedBox(height: 14),
+              const SizedBox(height: 9),
               Text(
                 widget.title,
                 maxLines: 2,
@@ -878,7 +997,7 @@ class _PremiumSurface extends StatelessWidget {
 
   const _PremiumSurface({
     required this.child,
-    this.padding = const EdgeInsets.all(18),
+    this.padding = const EdgeInsets.all(14),
   });
 
   @override
@@ -888,13 +1007,14 @@ class _PremiumSurface extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(isDark ? 0.18 : 0.06),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            blurRadius: 18,
+            spreadRadius: -8,
+            offset: const Offset(0, 9),
           ),
         ],
       ),
@@ -950,12 +1070,12 @@ class _EmptyState extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _TintedIcon(icon: icon, color: AppColors.lightAccent, size: 52),
-        const SizedBox(height: 14),
+        _TintedIcon(icon: icon, color: AppColors.lightAccent, size: 38),
+        const SizedBox(height: 10),
         Text(title, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 6),
         Text(message, style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         FilledButton.icon(
           onPressed: onAction,
           icon: const Icon(Icons.arrow_forward_rounded, size: 18),
@@ -1010,10 +1130,10 @@ class _DashboardSkeleton extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(height: 16),
         itemBuilder: (context, index) {
           return Container(
-            height: index == 0 ? 68 : (index == 1 ? 250 : 128),
+            height: index == 0 ? 56 : (index == 1 ? 156 : 92),
             decoration: BoxDecoration(
               color: base,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(18),
             ),
           );
         },
@@ -1037,7 +1157,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: Text(title, style: Theme.of(context).textTheme.headlineMedium)),
+        Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
         if (actionLabel != null && onAction != null)
           TextButton(onPressed: onAction, child: Text(actionLabel!)),
       ],
@@ -1059,15 +1179,15 @@ class _IconButtonSurface extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: isDark ? AppColors.darkCard : Colors.white,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          width: 48,
-          height: 48,
+          width: 42,
+          height: 42,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
           ),
           child: Icon(icon),
@@ -1085,7 +1205,7 @@ class _TintedIcon extends StatelessWidget {
   const _TintedIcon({
     required this.icon,
     required this.color,
-    this.size = 44,
+    this.size = 36,
   });
 
   @override
@@ -1095,7 +1215,7 @@ class _TintedIcon extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(13),
       ),
       child: Icon(icon, color: color, size: size * 0.52),
     );
@@ -1124,13 +1244,11 @@ class _Avatar extends StatelessWidget {
         borderRadius: BorderRadius.circular(size / 2.8),
       ),
       clipBehavior: Clip.antiAlias,
-      child: url != null && url!.isNotEmpty
-          ? Image.network(
-              url!,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Center(child: Text(initials, style: _avatarStyle(size))),
-            )
-          : Center(child: Text(initials, style: _avatarStyle(size))),
+      child: SafeImage(
+        url: url,
+        fit: BoxFit.cover,
+        fallback: Center(child: Text(initials, style: _avatarStyle(size))),
+      ),
     );
   }
 }
@@ -1194,22 +1312,27 @@ class _GradientCardButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: Colors.white.withOpacity(0.18),
-      borderRadius: BorderRadius.circular(16),
+      color: isDark ? AppColors.darkSecondaryCard : AppColors.lightSoftBlue,
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: Colors.white, size: 18),
-              const SizedBox(width: 8),
+              Icon(icon, color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary, size: 17),
+              const SizedBox(width: 6),
               Text(
                 label,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  color: isDark ? AppColors.darkPrimary : AppColors.lightPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -1275,13 +1398,6 @@ String _fallback(String? value, String fallback) {
   return text.isEmpty ? fallback : text;
 }
 
-String _greeting() {
-  final hour = DateTime.now().hour;
-  if (hour < 12) return 'Good Morning';
-  if (hour < 17) return 'Good Afternoon';
-  return 'Good Evening';
-}
-
 String _formattedToday() {
   return _formatDate(DateTime.now());
 }
@@ -1327,14 +1443,6 @@ Color _statusColor(String status) {
   if (normalized.contains('anxiety')) return AppColors.lightWarning;
   if (normalized.contains('normal') || normalized.contains('neutral')) return AppColors.lightSuccess;
   return AppColors.lightPrimary;
-}
-
-List<Color> _statusGradient(String status) {
-  final normalized = status.toLowerCase();
-  if (normalized.contains('depression')) return AppColors.dangerGradient;
-  if (normalized.contains('anxiety')) return AppColors.warningGradient;
-  if (normalized.contains('normal') || normalized.contains('neutral')) return AppColors.successGradient;
-  return AppColors.primaryGradient;
 }
 
 String _initials(String name) {

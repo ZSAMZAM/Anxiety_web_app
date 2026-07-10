@@ -1,8 +1,12 @@
+import 'api_config.dart';
+
 class AppConstants {
   // Backend API Configuration
-  static const String baseUrl = 'http://localhost:5000'; // For web/Chrome; use 10.0.2.2:5000 for Android emulator
+  static String get baseUrl => ApiConfig.baseUrl;
   static const String loginEndpoint = '/api/login';
   static const String registerEndpoint = '/api/register';
+  static const String phoneAvailabilityEndpoint =
+      '/api/register/phone-availability';
   static const String forgotPasswordEndpoint = '/api/forgot-password';
   static const String resetPasswordEndpoint = '/api/reset-password';
   static const String sendOtpEndpoint = '/api/otp/send';
@@ -15,8 +19,14 @@ class AppConstants {
   static const String paymentEndpoint = '/api/payments';
   static String paymentStatusEndpoint(String paymentId) =>
       '/api/payments/$paymentId/status';
+  static const String refundsEndpoint = '/api/refunds';
   static const String recommendationsEndpoint = '/api/recommendations';
   static const String notificationsEndpoint = '/api/user/notifications';
+  static const String latestTreatmentPlanEndpoint =
+      '/api/patient/treatment-plan/latest';
+  static const String treatmentPlansEndpoint = '/api/patient/treatment-plans';
+  static String treatmentPlanEndpoint(String reportId) =>
+      '/api/patient/treatment-plan/$reportId';
   static const String userProfileEndpoint = '/api/profile';
   static const String appointmentHistoryEndpoint = '/api/appointments';
   static const String predictionHistoryEndpoint = '/api/history';

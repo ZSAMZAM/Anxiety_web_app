@@ -17,8 +17,8 @@ class GradientButton extends StatefulWidget {
     this.colors = AppColors.primaryGradient,
     this.isLoading = false,
     this.width,
-    this.height = 58,
-    this.borderRadius = 20,
+    this.height = 46,
+    this.borderRadius = 14,
   }) : super(key: key);
 
   @override
@@ -47,12 +47,16 @@ class _GradientButtonState extends State<GradientButton>
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTapDown: (_) {
+        if (widget.isLoading) return;
         _animationController.forward();
       },
-      onTapUp: (_) {
+      onTap: () {
         _animationController.reverse();
-        if (!widget.isLoading) widget.onPressed();
+        if (!widget.isLoading) {
+          widget.onPressed();
+        }
       },
       onTapCancel: () {
         _animationController.reverse();
@@ -72,21 +76,20 @@ class _GradientButtonState extends State<GradientButton>
             borderRadius: BorderRadius.circular(widget.borderRadius),
             boxShadow: [
               BoxShadow(
-                color: widget.colors[0].withOpacity(0.3),
-                blurRadius: 22,
-                spreadRadius: -6,
-                offset: const Offset(0, 14),
+                color: widget.colors.last.withOpacity(0.32),
+                blurRadius: 18,
+                spreadRadius: -9,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
           child: Center(
             child: widget.isLoading
-                ? SizedBox(
-                    height: 24,
-                    width: 24,
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
                     child: CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation(Colors.white),
+                      valueColor: AlwaysStoppedAnimation(Colors.white),
                       strokeWidth: 2,
                     ),
                   )
@@ -94,8 +97,8 @@ class _GradientButtonState extends State<GradientButton>
                     widget.label,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
           ),
@@ -123,13 +126,13 @@ class PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: width ?? double.infinity,
-      height: 58,
+      height: 46,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         child: isLoading
             ? const SizedBox(
-                height: 24,
-                width: 24,
+                height: 20,
+                width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor:
@@ -159,7 +162,7 @@ class SecondaryButton extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return SizedBox(
       width: width ?? double.infinity,
-      height: 58,
+      height: 46,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
